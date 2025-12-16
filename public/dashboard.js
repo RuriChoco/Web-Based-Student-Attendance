@@ -349,6 +349,29 @@ document.addEventListener('DOMContentLoaded', () => {
         initHistorySection();
     };
 
+    const loadPasswordSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Change My Password</h3>
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn">Change Password</button>
+                </form>
+            </div>`;
+        initPasswordChange();
+    };
+
     // --- Navigation ---
 
     const loadSection = (sectionName) => {
@@ -374,6 +397,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'history':
                 loadHistorySection();
+                break;
+            case 'password':
+                loadPasswordSection();
                 break;
             case 'staff':
                 loadStaffSection();
@@ -401,9 +427,9 @@ document.addEventListener('DOMContentLoaded', () => {
         userRoleBadge.textContent = user.role;
 
         const rolePermissions = {
-            admin: ['dashboard', 'students', 'staff', 'attendance', 'excuses', 'history', 'audit'],
-            registrar: ['dashboard', 'students'],
-            teacher: ['dashboard', 'attendance', 'excuses', 'history']
+            admin: ['dashboard', 'students', 'attendance', 'excuses', 'history', 'password', 'staff', 'audit'],
+            registrar: ['dashboard', 'students', 'password'],
+            teacher: ['dashboard', 'attendance', 'excuses', 'history', 'password']
         };
 
         const allowedSections = rolePermissions[user.role] || [];
@@ -1008,6 +1034,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         fetchAllStudents();
+    };
+
+    // --- Password Change Logic ---
+    const initPasswordChange = () => {
+        const form = document.getElementById('changePasswordForm');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                return showMessage('New passwords do not match.', 'error');
+            }
+
+            const result = await apiFetch('/api/user/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+
+            if (result && result.success) {
+                showMessage('Password changed successfully.');
+                form.reset();
+            }
+        });
     };
 
     // --- Dashboard Stats Logic ---

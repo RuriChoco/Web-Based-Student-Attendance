@@ -72,7 +72,7 @@ app.post('/api/login', asyncHandler(async (req, res) => {
     const { username, password } = req.body;
     const db = await dbPromise;
     const user = await db.get(`
-        SELECT u.*, sd.student_code
+        SELECT u.*, sd.student_code, sd.room
         FROM users u
         LEFT JOIN student_details sd ON u.id = sd.user_id
         WHERE u.username = ?
@@ -91,7 +91,8 @@ app.post('/api/login', asyncHandler(async (req, res) => {
             username: user.username,
             name: user.name,
             role: user.role,
-            student_code: user.student_code
+            student_code: user.student_code,
+            room: user.room
         };
         res.json({ success: true });
         await logAction(user.id, user.username, 'LOGIN_SUCCESS');
@@ -938,7 +939,7 @@ app.get('/api/summary/:student_code', asyncHandler(async (req, res) => {
         const db = await dbPromise;
 
         const student = await db.get(`
-            SELECT u.id, u.name FROM users u
+            SELECT u.id, u.name, sd.student_code, sd.room FROM users u
             JOIN student_details sd ON u.id = sd.user_id
             WHERE sd.student_code = ? AND u.role = 'student'
         `, student_code);
@@ -963,7 +964,7 @@ app.get('/api/summary/:student_code', asyncHandler(async (req, res) => {
             }
         });
 
-        res.json({ name: student.name, summary });
+        res.json({ name: student.name, student_code: student.student_code, room: student.room, summary });
     } catch (err) {
         throw err;
     }
@@ -983,44 +984,6 @@ app.get('/api/public/student/:code', asyncHandler(async (req, res) => {
         res.json(student);
     } else {
         res.status(404).json({ error: 'Student code not found.' });
-    }
-}));
-
-// New public endpoint for submitting excuses
-app.post('/api/public/excuse', asyncHandler(async (req, res) => {
-    const { code, reason, date } = req.body;
-    if (!code || !reason || !date) {
-        return res.status(400).json({ error: 'Student code, date, and reason are required.' });
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (new Date(date) < today) {
-        return res.status(400).json({ error: 'Cannot submit an excuse for a past date.' });
-    }
-
-    const db = await dbPromise;
-    const student = await db.get(`
-        SELECT u.id, u.name FROM users u
-        JOIN student_details sd ON u.id = sd.user_id
-        WHERE sd.student_code = ? AND u.role = 'student'
-    `, code);
-
-    if (!student) {
-        return res.status(404).json({ error: 'Student code not found.' });
-    }
-
-    const result = await db.run(`
-        INSERT INTO excuses (user_id, date, reason)
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id, date) DO UPDATE SET reason = excluded.reason, status = 'Pending'
-        WHERE excuses.status = 'Pending'
-    `, [student.id, date, reason]);
-
-    if (result.changes > 0) {
-        res.status(201).json({ message: 'Excuse submitted or updated successfully.' });
-    } else {
-        res.status(403).json({ error: 'Cannot update an excuse that has already been processed.' });
     }
 }));
 
@@ -1078,7 +1041,34 @@ app.get('/api/student/summary', asyncHandler(async (req, res) => {
     }
 }));
 
-app.post('/api/student/change-password', asyncHandler(async (req, res) => {
+// Audit Log (admin only)
+app.get('/api/audit-logs', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20; // Fixed limit for logs
+    const offset = (page - 1) * limit;
+
+    const db = await dbPromise;
+    const logs = await db.all(
+        'SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ? OFFSET ?',
+        [limit, offset]
+    );
+    const totalResult = await db.get('SELECT COUNT(*) as count FROM audit_logs');
+    const totalLogs = totalResult.count;
+    const totalPages = Math.ceil(totalLogs / limit);
+
+    res.json({
+        logs,
+        pagination: {
+            currentPage: page,
+            totalPages,
+            totalLogs,
+        },
+    });
+}));
+
+// --- Generic Authenticated User Actions ---
+
+app.post('/api/user/change-password', isAuthenticated, asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const { id: userId, username } = req.session.user;
 
@@ -1106,31 +1096,6 @@ app.post('/api/student/change-password', asyncHandler(async (req, res) => {
 
     await logAction(userId, username, 'CHANGE_PASSWORD_SUCCESS');
     res.json({ success: true, message: 'Password changed successfully.' });
-}));
-
-// Audit Log (admin only)
-app.get('/api/audit-logs', requireRole(['admin']), asyncHandler(async (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = 20; // Fixed limit for logs
-    const offset = (page - 1) * limit;
-
-    const db = await dbPromise;
-    const logs = await db.all(
-        'SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ? OFFSET ?',
-        [limit, offset]
-    );
-    const totalResult = await db.get('SELECT COUNT(*) as count FROM audit_logs');
-    const totalLogs = totalResult.count;
-    const totalPages = Math.ceil(totalLogs / limit);
-
-    res.json({
-        logs,
-        pagination: {
-            currentPage: page,
-            totalPages,
-            totalLogs,
-        },
-    });
 }));
 
 // --- Serve Frontend ---

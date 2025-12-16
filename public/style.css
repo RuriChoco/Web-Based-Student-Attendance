@@ -152,7 +152,7 @@ th { background:var(--background); color:var(--text-secondary); font-weight: 600
 .status-Present { color: var(--green); font-weight:bold; }
 .status-Late { color: var(--orange); font-weight:bold; }
 .status-Absent { color: var(--red); font-weight:bold; }
-.status-Excused { color: var(--blue); font-weight:bold; }
+.status-Excused { color: var(--primary); font-weight:bold; }
 
 /* --- Login Page --- */
 .login-page {
@@ -582,70 +582,149 @@ td pre {
     margin-bottom: 5px;
 }
 
+/* --- Report Summary On-Screen Styles --- */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+.summary-item {
+    text-align: center;
+    padding: 15px;
+    background-color: var(--background);
+    border-radius: 8px;
+}
+.summary-value { font-size: 24px; font-weight: 700; display: block; }
+.summary-label { font-size: 13px; color: var(--text-secondary); text-transform: uppercase; }
+
 /* --- Print-Specific Styles --- */
 @media print {
-  /* Hide all non-essential UI components */
-  .sidebar,
-  .portal-header,
-  .card-tabs,
-  #lookupForm,
-  #viewStatusForm,
-  #excuseForm,
-  #summaryForm,
-  .toastContainer,
-  .sidebar-footer,
-  .portal-login-link,
-  #printSummaryBtn, /* Hide the print button itself */
-  .btn /* Hide all other buttons */ {
-    display: none !important;
-  }
+    /* Hide all non-essential UI components for a clean report */
+    .sidebar, .mobile-header, .portal-header, .card-tabs, #lookupForm, #viewStatusForm, #excuseForm, #summaryForm, .toastContainer, .sidebar-footer, .portal-login-link, #printSummaryBtn, .btn {
+        display: none !important;
+    }
 
-  /* Reset body and layout for a clean print page */
-  body {
-    background: #fff !important;
-    padding: 20px !important;
-    margin: 0 !important;
-    color: #000 !important;
-  }
+    /* Define page layout for printing */
+    @page {
+        size: A4;
+        margin: 0.75in;
+    }
 
-  .dashboard-layout, .main-content, .portal-container, .card {
-    display: block !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    gap: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    background: #fff !important;
-  }
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 11pt;
+        line-height: 1.5;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
 
-  /* Ensure the summary result is visible and styled for print */
-  #summaryResult {
-    display: block !important;
-  }
+    /* Remove all layout styles from containers */
+    .dashboard-layout, .main-content, #dynamicContentContainer, .portal-container, .card {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: none !important;
+    }
 
-  /* Style the report title */
-  #summaryResult h4 {
-    color: #000;
-    margin-top: 0;
-    font-size: 20px;
-  }
-  
-  /* Hide the generic "Records for..." title on the public page */
-  #resultsContainer h3 {
-      display: none !important;
-  }
-  
-  /* Add a main title for the printed document */
-  body::before {
-      content: "Student Attendance Summary Report";
-      display: block;
-      font-size: 24px;
-      font-weight: bold;
-      margin-bottom: 25px;
-      text-align: center;
-      border-bottom: 2px solid #000;
-      padding-bottom: 10px;
-  }
+    /* Ensure only the summary result is visible */
+    #summaryResult {
+        display: block !important;
+    }
+    .card:not(:has(#summaryResult)) {
+        display: none !important;
+    }
+    #resultsContainer h3 {
+        display: none !important;
+    }
+
+    /* Report Letterhead */
+    body::before {
+        content: 'Zamboanga del Sur Provincial Government College';
+        display: block;
+        text-align: center;
+        font-size: 18pt;
+        font-weight: 300; /* Lighter for elegance */
+        color: #444;
+        margin-bottom: 1cm;
+        border-bottom: 2px solid var(--primary);
+        padding-bottom: 0.5cm;
+    }
+
+    /* Report Footer with print date */
+    body::after {
+        content: "Printed on: " attr(data-print-date);
+        display: block;
+        position: fixed;
+        bottom: 0.5in;
+        left: 0.75in;
+        font-size: 8pt;
+        color: #999;
+    }
+
+    /* Hide the on-screen summary title and use our new structure */
+    #summaryResult h4 { display: none; }
+    #summaryResult > p { display: none; }
+    #summaryResult > ul { display: none; }
+    .report-summary ul { display: none; } /* Hide old list if present */
+
+    /* Style the new report blocks */
+    .report-header {
+        text-align: center;
+        margin-bottom: 0.5cm;
+    }
+    .report-header h4 {
+        font-size: 22pt;
+        font-weight: 600;
+        margin: 0 0 5px 0;
+    }
+    .report-header p {
+        font-size: 11pt;
+        color: #333;
+        margin: 0;
+    }
+
+    .report-meta {
+        text-align: center;
+        margin-bottom: 1cm;
+        padding: 10px;
+        background-color: #f7f7f7;
+        border-radius: 6px;
+        font-style: italic;
+        font-size: 11pt;
+    }
+    .report-meta p {
+        margin: 0;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(4, 1fr); /* Force 4 columns on print */
+    }
+    .summary-item {
+        border: 1px solid #ddd;
+        padding: 20px;
+        background-color: transparent; /* Override on-screen bg */
+    }
+    .summary-value {
+        font-size: 36pt;
+        line-height: 1;
+    }
+    .summary-label {
+        margin-top: 10px;
+        font-size: 11pt;
+        color: #666;
+    }
+
+    /* Ensure status colors are printed */
+    .status-Present, .status-Late, .status-Absent, .status-Excused {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
 }
 
 /* --- Dashboard Stats --- */

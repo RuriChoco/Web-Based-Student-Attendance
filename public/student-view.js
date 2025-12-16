@@ -13,13 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabButtons = document.querySelectorAll('.card-tab-btn');
     const tabContents = {
         status: document.getElementById('statusTab'),
-        excuse: document.getElementById('excuseTab'),
         summary: document.getElementById('summaryTab'),
     };
 
     // Forms
     const viewStatusForm = document.getElementById('viewStatusForm');
-    const excuseForm = document.getElementById('excuseForm');
     const summaryForm = document.getElementById('summaryForm');
 
     const getTodayDateString = () => new Date().toISOString().split('T')[0];
@@ -67,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const initializeForms = () => {
         // Set default dates
         document.getElementById('viewDate').value = getTodayDateString();
-        document.getElementById('excuseDate').value = getTodayDateString();
         document.getElementById('summaryEndDate').value = getTodayDateString();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 30);
@@ -94,27 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    excuseForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const excuse = {
-            code: currentStudent.student_code,
-            date: document.getElementById('excuseDate').value,
-            reason: document.getElementById('excuseReason').value.trim()
-        };
-
-        const result = await apiFetch('/api/public/excuse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(excuse)
-        });
-
-        if (result) {
-            showMessage(result.data.message || 'Excuse submitted for review.');
-            excuseForm.reset();
-            document.getElementById('excuseDate').value = getTodayDateString();
-        }
-    });
-
     summaryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const startDate = document.getElementById('summaryStartDate').value;
@@ -128,22 +104,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const response = await apiFetch(`/api/summary/${currentStudent.student_code}?start=${startDate}&end=${endDate}`);
         if (response && response.success) {
-            const { name, summary } = response.data;
+            const { name, student_code, room, summary } = response.data;
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = `
-                <h4>Summary for ${name}</h4>
-                <p><strong>Date Range:</strong> ${startDate} to ${endDate}</p>
-                <ul>
-                    <li><strong>Present:</strong> ${summary.Present}</li>
-                    <li><strong>Late:</strong> ${summary.Late}</li>
-                    <li><strong>Absent:</strong> ${summary.Absent}</li>
-                    <li><strong>Excused:</strong> ${summary.Excused}</li>
-                    </ul>
+                <div class="report-header">
+                    <h4>${name}</h4>
+                    <p><strong>Student ID:</strong> ${student_code} | <strong>Room:</strong> ${room || 'N/A'}</p>
+                </div>
+                <div class="report-meta">
+                    <p><strong>Report Period:</strong> ${startDate} to ${endDate}</p>
+                </div>
+                <div class="report-summary">
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span class="summary-value status-Present">${summary.Present}</span>
+                            <span class="summary-label">Present</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-value status-Late">${summary.Late}</span>
+                            <span class="summary-label">Late</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-value status-Absent">${summary.Absent}</span>
+                            <span class="summary-label">Absent</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-value status-Excused">${summary.Excused}</span>
+                            <span class="summary-label">Excused</span>
+                        </div>
+                    </div>
+                </div>
                     <div class="form-row" style="justify-content: flex-end; margin-top: 15px;">
                         <button id="printSummaryBtn" class="btn btn-green">Print Report</button>
                     </div>
                 `;
                 document.getElementById('printSummaryBtn').addEventListener('click', () => {
+                    document.body.setAttribute('data-print-date', new Date().toLocaleDateString());
                     window.print();
                 });
         } else {

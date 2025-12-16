@@ -156,19 +156,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 const summary = response.data;
                 resultDiv.style.display = 'block';
                 resultDiv.innerHTML = `
-                    <h4>Summary for ${currentUser.name}</h4>
-                    <p><strong>Date Range:</strong> ${startDate} to ${endDate}</p>
-                    <ul>
-                        <li><strong>Present:</strong> ${summary.Present}</li>
-                        <li><strong>Late:</strong> ${summary.Late}</li>
-                        <li><strong>Absent:</strong> ${summary.Absent}</li>
-                        <li><strong>Excused:</strong> ${summary.Excused}</li>
-                    </ul>
+                    <div class="report-header">
+                        <h4>${currentUser.name}</h4>
+                        <p><strong>Student ID:</strong> ${currentUser.student_code} | <strong>Room:</strong> ${currentUser.room || 'N/A'}</p>
+                    </div>
+                    <div class="report-meta">
+                        <p><strong>Report Period:</strong> ${startDate} to ${endDate}</p>
+                    </div>
+                    <div class="report-summary">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span class="summary-value status-Present">${summary.Present}</span>
+                                <span class="summary-label">Present</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-value status-Late">${summary.Late}</span>
+                                <span class="summary-label">Late</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-value status-Absent">${summary.Absent}</span>
+                                <span class="summary-label">Absent</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-value status-Excused">${summary.Excused}</span>
+                                <span class="summary-label">Excused</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="form-row" style="justify-content: flex-end; margin-top: 15px;">
                         <button id="printSummaryBtn" class="btn btn-green">Print Report</button>
                     </div>
                 `;
                 document.getElementById('printSummaryBtn').addEventListener('click', () => {
+                    document.body.setAttribute('data-print-date', new Date().toLocaleDateString());
                     window.print();
                 });
             } else {
@@ -211,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return showMessage('New passwords do not match.', 'error');
             }
 
-            const result = await apiFetch('/api/student/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }) });
+            const result = await apiFetch('/api/user/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }) });
 
             if (result && result.success) {
                 showMessage('Password changed successfully.');
