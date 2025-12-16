@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Student Dashboard - Attendance System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3 id="studentNameDisplay">Student</h3>
+                <span id="studentCodeDisplay" class="role-badge"></span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-section="summary">My Summary</a>
+                <a href="#" class="nav-link" data-section="excuse">Submit Excuse</a>
+                <a href="#" class="nav-link" data-section="password">Change Password</a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-red">Logout</button>
+            </div>
+        </aside>
+        <main class="main-content" id="mainContent">
+            <header class="mobile-header">
+                <button id="menuToggleBtn" class="menu-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <h3 id="mobileHeaderTitle">My Summary</h3>
+            </header>
+            <div id="dynamicContentContainer">
+                <!-- Content will be loaded here by JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <div id="toastContainer"></div>
+    <script type="module" src="student-dashboard.js"></script>
+</body>
+</html>

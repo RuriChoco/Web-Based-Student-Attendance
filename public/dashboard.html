@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Dashboard - Attendance System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3>Attendance System</h3>
+                <span id="userRoleBadge" class="role-badge"></span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active" data-section="dashboard">Dashboard</a>
+                <a href="#" class="nav-link" data-section="students">Students</a>
+                <a href="#" class="nav-link" data-section="attendance">Attendance</a>
+                <a href="#" class="nav-link" data-section="excuses">Excuses</a>
+                <a href="#" class="nav-link" data-section="history">Student History</a>
+                <a href="#" class="nav-link" data-section="staff">Staff</a>
+                <a href="#" class="nav-link" data-section="audit">Audit Log</a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-red">Logout</button>
+            </div>
+        </aside>
+        <main class="main-content" id="mainContent">
+            <header class="mobile-header">
+                <button id="menuToggleBtn" class="menu-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <h3 id="mobileHeaderTitle">Dashboard</h3>
+            </header>
+            <div id="dynamicContentContainer">
+                <!-- Content will be loaded here by JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <!-- Student Profile Modal -->
+    <div id="studentProfileModal" class="modal" style="display:none;">
+        <div class="modal-content modal-lg">
+            <div id="profileModalContent">
+                <!-- Profile content will be loaded here by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Student Modal -->
+    <div id="studentFormModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="studentFormTitle">Add New Student</h3>
+            <form id="studentForm">
+                <input type="hidden" id="editStudentCode">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="stuName" required>
+                </div>
+                <div class="form-group" id="studentCodeGroup">
+                    <label>Student ID</label>
+                    <input type="text" id="stuCode" required>
+                </div>
+                <div class="form-group" id="manualStudentCodeGroup">
+                    <label>Student ID (Optional)</label>
+                    <input type="text" id="manualStudentCode" placeholder="e.g., 2023-159">
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1"><label>Age</label><input type="number" id="stuAge" required></div>
+                    <div class="form-group flex-1"><label>Gender</label><select id="stuGender" required><option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                </div>
+                <div class="form-group">
+                    <label>Room</label>
+                    <input type="text" id="stuRoom" required>
+                </div>
+                <div class="form-row" style="justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="cancelStudentFormBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
+                    <button type="submit" class="btn btn-green">Save Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reset Link Modal -->
+    <div id="resetLinkModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3>Password Reset Link</h3>
+            <p>Share this secure link with the user. It is valid for one hour.</p>
+            <div class="form-group">
+                <input type="text" id="resetLinkInput" readonly>
+            </div>
+            <div class="form-row" style="justify-content: flex-end; gap: 10px;">
+                <button type="button" id="copyResetLinkBtn" class="btn btn-green">Copy Link</button>
+                <button type="button" id="closeResetLinkModalBtn" class="btn" style="background-color: var(--text-secondary);">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="dashboard.js"></script>
+</body>
+</html>

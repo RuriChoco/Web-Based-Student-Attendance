@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Student Public Portal - Attendance System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+    <div class="portal-container">
+        <div class="card">
+            <div class="portal-header">
+                <h2>Student Public Portal</h2>
+                <p>Enter your student code to view your records.</p>
+                <a href="/login.html" class="portal-login-link">Staff or Student Login</a>
+            </div>
+
+            <!-- Step 1: Lookup -->
+            <form id="lookupForm" class="form-row">
+                <input type="text" id="lookupCode" placeholder="Enter your 3-digit student code" required autofocus>
+                <button type="submit" class="btn">Find My Records</button>
+            </form>
+
+            <!-- Step 2: Results (hidden by default) -->
+            <div id="resultsContainer" style="display: none;">
+                <h3 id="studentNameDisplay"></h3>
+                <div class="card-tabs">
+                    <button class="card-tab-btn active" data-tab="status">View Status</button>
+                    <button class="card-tab-btn" data-tab="excuse">Submit Excuse</button>
+                    <button class="card-tab-btn" data-tab="summary">View Summary</button>
+                </div>
+
+                <!-- Status Tab -->
+                <div id="statusTab" class="card-tab-content">
+                    <form id="viewStatusForm" class="form-row">
+                        <input type="date" id="viewDate" required>
+                        <button type="submit" class="btn">View Status</button>
+                    </form>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>CODE</th><th>NAME</th><th>TIME</th><th>STATUS</th></tr></thead>
+                            <tbody id="viewStatusTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Excuse Tab -->
+                <div id="excuseTab" class="card-tab-content" style="display: none;">
+                    <form id="excuseForm" class="form-row">
+                        <input type="date" id="excuseDate" required>
+                        <textarea id="excuseReason" placeholder="Enter your reason" required></textarea>
+                        <button type="submit" class="btn">Submit for Review</button>
+                    </form>
+                </div>
+
+                <!-- Summary Tab -->
+                <div id="summaryTab" class="card-tab-content" style="display: none;">
+                    <form id="summaryForm" class="form-row">
+                        <input type="date" id="summaryStartDate" required>
+                        <input type="date" id="summaryEndDate" required>
+                        <button type="submit" class="btn">Get Summary</button>
+                    </form>
+                    <div id="summaryResult" style="margin-top: 10px; display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer"></div>
+    <script type="module" src="student-view.js"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Student Account Setup - Attendance System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+    <div class="login-wrapper">
+        <div class="login-branding">
+            <div class="branding-content">
+                <h1>ZDSPGC</h1>
+                <p>Student Account Setup</p>
+            </div>
+        </div>
+        <div class="login-form-container">
+            <div class="login-inner-card">
+                <!-- Step 1: Validate ID -->
+                <div id="step1">
+                    <h2>First-Time Setup</h2>
+                    <p>Please enter your official Student ID to begin.</p>
+                    <form id="validateIdForm">
+                        <div id="validateError" class="form-error" style="display: none;"></div>
+                        <div class="form-group">
+                            <label for="student_code">Student ID</label>
+                            <input type="text" id="student_code" placeholder="e.g., 2023-159" required autofocus>
+                        </div>
+                        <button type="submit" class="btn btn-full">Continue</button>
+                    </form>
+                </div>
+
+                <!-- Step 2: Create Credentials -->
+                <div id="step2" style="display: none;">
+                    <h2>Create Your Account</h2>
+                    <p>Welcome, <strong id="studentName"></strong>! Please create your username and password.</p>
+                    <form id="createCredentialsForm">
+                        <div id="createError" class="form-error" style="display: none;"></div>
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-full">Complete Setup</button>
+                    </form>
+                </div>
+
+                <div class="login-footer">
+                    <a href="/login.html">Already have an account? Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="student-setup.js"></script>
+</body>
+</html>
