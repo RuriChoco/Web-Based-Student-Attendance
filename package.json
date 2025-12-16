@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "init-db": "node database.js"
+    "init-db": "node database.js",
+    "package": "sh package.sh"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

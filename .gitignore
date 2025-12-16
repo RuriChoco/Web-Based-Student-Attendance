@@ -11,3 +11,10 @@ attendance.db
 #package files
 package-lock.json
 yarn.lock
+
+#session files
+sessions/
+
+#package output
+*.zip
+package.sh
