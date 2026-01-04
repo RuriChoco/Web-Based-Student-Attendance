@@ -47,8 +47,40 @@ const isAuthenticated = (req, res, next) => req.session.user ? next() : res.stat
 // Wrapper for async routes to catch errors and pass them to the error handler
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-// Helper to pad student code
-const padCode = (n) => String(n).padStart(3, '0');
+// Helper to generate student code in format YYYY-XXX where XXX is a per-year sequential padded number
+// Ensures uniqueness by looping until an unused code is found and commits the used sequence number atomically.
+const generateStudentCode = async (db) => {
+    const year = new Date().getFullYear();
+    const key = `last_student_seq_${year}`;
+
+    try {
+        // Start a transaction to reduce race conditions
+        await db.run('BEGIN IMMEDIATE');
+
+        // Get current sequence for this year (0 if none)
+        const row = await db.get('SELECT value FROM app_meta WHERE key = ?', key);
+        let seq = row ? row.value : 0;
+        let candidate;
+
+        // Find next unused sequence
+        while (true) {
+            seq += 1;
+            const seqStr = String(seq).padStart(3, '0');
+            candidate = `${year}-${seqStr}`;
+            const exists = await db.get('SELECT 1 FROM student_details WHERE student_code = ?', candidate);
+            if (!exists) break; // found a free code
+        }
+
+        // Update the sequence value in app_meta
+        await db.run('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [key, seq]);
+
+        await db.run('COMMIT');
+        return candidate;
+    } catch (err) {
+        try { await db.run('ROLLBACK'); } catch (e) { /* ignore rollback errors */ }
+        throw err;
+    }
+};
 
 // --- Audit Log Helper ---
 const logAction = async (userId, username, action, details = {}) => {
@@ -62,8 +94,17 @@ const logAction = async (userId, username, action, details = {}) => {
 };
 // --- API Endpoints ---
 
-// Handle favicon requests to prevent 404s in the console
+const fs = require('fs');
+
+// Serve icons directory at /icons
+app.use('/icons', express.static(path.join(__dirname, 'icons')));
+
+// Handle favicon requests by serving the school icon if available, otherwise return 204
 app.get('/favicon.ico', (req, res) => {
+    const icoPath = path.join(__dirname, 'icons', 'school-icon.jpeg');
+    if (fs.existsSync(icoPath)) {
+        return res.sendFile(icoPath);
+    }
     res.status(204).send();
 });
 
@@ -330,11 +371,8 @@ app.post('/api/students', requireRole(['admin', 'registrar']), asyncHandler(asyn
                 return res.status(409).json({ error: 'This Student ID is already in use.' });
             }
         } else {
-            // Generate a new code
-            const lastCodeRow = await db.get("SELECT value FROM app_meta WHERE key = 'last_student_code'");
-            const newCodeNum = lastCodeRow.value + 1;
-            studentCode = padCode(newCodeNum);
-            await db.run("UPDATE app_meta SET value = ? WHERE key = 'last_student_code'", newCodeNum);
+                // Generate a new code with year-prefix and per-year sequence
+                studentCode = await generateStudentCode(db);
         }
 
         // 1. Insert into users table
@@ -458,10 +496,8 @@ app.post('/api/students/upload-csv', requireRole(['admin', 'registrar']), upload
                             throw new Error(`Student ID ${studentCode} is already in use.`);
                         }
                     } else {
-                        const lastCodeRow = await db.get("SELECT value FROM app_meta WHERE key = 'last_student_code'");
-                        const newCodeNum = lastCodeRow.value + 1;
-                        studentCode = padCode(newCodeNum);
-                        await db.run("UPDATE app_meta SET value = ? WHERE key = 'last_student_code'", newCodeNum);
+                        // Generate a per-year student code like YYYY-XXX
+                        studentCode = await generateStudentCode(db);
                     }
 
                     const userResult = await db.run("INSERT INTO users (role, name) VALUES ('student', ?)", [name]);
@@ -1133,6 +1169,11 @@ async function startServer() {
         // Wait for the database connection to be established
         const db = await dbPromise;
         console.log('Database connection established.');
+
+        // Ensure schema exists (idempotent) before running queries that rely on tables
+        if (typeof dbPromise.ensureSchema === 'function') {
+            await dbPromise.ensureSchema();
+        }
 
         // Check if an admin user exists
         const adminUser = await db.get("SELECT username FROM users WHERE role = 'admin'");

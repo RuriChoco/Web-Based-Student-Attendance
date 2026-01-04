@@ -140,6 +140,7 @@ th { background:var(--background); color:var(--text-secondary); font-weight: 600
 .gender-f { background:#fff0f4; }
 
 .small { font-size:13px; color:var(--muted); }
+.muted { color: var(--text-secondary); font-size: 13px; }
 
 .teacher-indicator {
   background: #eaf6ff;
@@ -194,6 +195,29 @@ th { background:var(--background); color:var(--text-secondary); font-weight: 600
     opacity: 0.8;
     margin-top: 10px;
 }
+.branding-logo {
+    width: 96px;
+    height: 96px;
+    display: block;
+    margin: 0 auto 14px auto;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(255,255,255,0.06);
+    padding: 6px;
+    object-fit: cover;
+}
+
+/* Smaller circular logo for sidebars */
+.sidebar-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+    overflow: hidden;
+}
 .login-form-container {
     width: 55%;
     background: white;
@@ -235,6 +259,62 @@ th { background:var(--background); color:var(--text-secondary); font-weight: 600
     font-size: 14px;
     text-align: center;
 }
+
+.excuse-status-card {
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    border-radius: 8px;
+    background: #fff;
+}
+
+#reasonCounter {
+    font-weight: 600;
+}
+
+textarea#excuseReason { min-height: 140px; width: 100%; resize: vertical; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; }
+
+/* Two-column layout for excuse forms: date + reason */
+.excuse-grid { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: start; }
+@media (max-width: 720px) { .excuse-grid { grid-template-columns: 1fr; } }
+.excuse-grid .form-group { margin-bottom: 0; }
+
+/* Center and widen on large screens */
+.excuse-card { max-width: 900px; margin-left: auto; margin-right: auto; }
+.excuse-form-wrapper { max-width: 900px; margin-left: auto; margin-right: auto; }
+
+@media (min-width: 1200px) {
+    .excuse-grid { grid-template-columns: 260px 1fr; gap: 20px; }
+    .excuse-card { max-width: 1100px; }
+    .excuse-form-wrapper { max-width: 1100px; }
+    textarea#excuseReason { min-height: 180px; }
+}
+
+/* Spinner and submit feedback */
+.spinner {
+  display:inline-block;
+  width:16px;
+  height:16px;
+  border:2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius:50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align:middle;
+  margin-right:8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.btn.loading { opacity: 0.9; pointer-events: none; }
+.btn.success { background: var(--green); transform: scale(1.02); transition: transform 0.12s ease; }
+
+/* Small visual for temporary success state */
+.btn.success::after { content: '';} 
+
+.form-group label { display: block; margin-bottom: 6px; font-weight: 600; }
+input[type="date"] { min-width: 160px; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; }
+
+textarea:focus, input[type="date"]:focus { outline: none; box-shadow: 0 0 0 3px var(--primary-light); border-color: var(--primary); }
+
+.excuse-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .form-group.flex-1 {
     flex: 1;
 }
@@ -597,6 +677,15 @@ td pre {
 }
 .summary-value { font-size: 24px; font-weight: 700; display: block; }
 .summary-label { font-size: 13px; color: var(--text-secondary); text-transform: uppercase; }
+
+.range-buttons { display:flex; gap:8px; }
+.range-buttons .btn { padding:6px 10px; font-size:13px; }
+.range-buttons .btn.active { background: var(--primary-dark); box-shadow: 0 0 0 2px var(--primary-light); color: #fff; }
+
+.donut-chart { width: 140px; height: 140px; display:flex; align-items:center; justify-content:center; }
+.summary-top { align-items:center; display:flex; gap:20px; }
+
+@media (max-width:720px) { .summary-top { flex-direction: column; align-items: stretch; } .donut-chart { margin: 0 auto; } }
 
 /* --- Print-Specific Styles --- */
 @media print {

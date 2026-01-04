@@ -522,21 +522,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const openModal = (studentData = null) => {
             form.reset();
+            const stuCodeInput = form.querySelector('#stuCode');
+            const manualCodeInput = form.querySelector('#manualStudentCode');
             if (studentData) { // Editing
                 formTitle.textContent = 'Edit Student';
                 editCodeInput.value = studentData.code;
                 form.querySelector('#stuName').value = studentData.name;
-                form.querySelector('#stuCode').value = studentData.code;
+                stuCodeInput.value = studentData.code;
                 form.querySelector('#stuAge').value = studentData.age;
                 form.querySelector('#stuGender').value = studentData.gender;
                 form.querySelector('#stuRoom').value = studentData.room;
+
+                // Show student code input and make it active for validation
                 form.querySelector('#manualStudentCodeGroup').style.display = 'none';
                 form.querySelector('#studentCodeGroup').style.display = 'block';
+                stuCodeInput.disabled = false;
+                stuCodeInput.required = true;
+
+                // Disable manual code input so it won't be validated while hidden
+                manualCodeInput.disabled = true;
+                manualCodeInput.required = false;
             } else { // Adding
                 formTitle.textContent = 'Add New Student';
                 editCodeInput.value = '';
                 form.querySelector('#manualStudentCodeGroup').style.display = 'block';
                 form.querySelector('#studentCodeGroup').style.display = 'none';
+
+                // For adding, we use manual code field (optional) and disable the hidden stuCode
+                stuCodeInput.disabled = true;
+                stuCodeInput.required = false;
+
+                manualCodeInput.disabled = false;
+                manualCodeInput.required = false; // optional field
             }
             modal.style.display = 'flex';
         };

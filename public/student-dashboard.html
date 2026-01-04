@@ -7,14 +7,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Student Dashboard - Attendance System</title>
+    <link rel="icon" href="/icons/school-icon.jpeg" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="dashboard-layout">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h3 id="studentNameDisplay">Student</h3>
-                <span id="studentCodeDisplay" class="role-badge"></span>
+                <img src="/icons/school-icon.jpeg" alt="School logo" class="sidebar-logo">
+                <h3 id="studentNameDisplay" style="display:inline-block;vertical-align:middle;margin:0;">Student</h3>
+                <span id="studentCodeDisplay" class="role-badge" style="display:block;margin-top:6px;"></span>
             </div>
             <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-section="summary">My Summary</a>
