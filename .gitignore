@@ -3,6 +3,8 @@ node_modules/
 
 #sample
 sample.txt
+TECHNICAL_OVERVIEW.md
+scripts/
 
 #database files
 database.sqlite
@@ -17,4 +19,6 @@ sessions/
 
 #package output
 *.zip
-package.sh
+packager.sh
+
+
