@@ -62,13 +62,84 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Form Initialization and Logic ---
-    const initializeForms = () => {
+    const initializeForms = async () => {
         // Set default dates
         document.getElementById('viewDate').value = getTodayDateString();
         document.getElementById('summaryEndDate').value = getTodayDateString();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 30);
         document.getElementById('summaryStartDate').value = startDate.toISOString().split('T')[0];
+
+        // Improve UX: show notice on Excuse tab if user is not signed-in as student
+        try {
+            const sessionResp = await apiFetch('/api/session');
+            if (sessionResp && sessionResp.success) {
+                const { data } = sessionResp;
+                const excuseTab = document.getElementById('excuseTab');
+                if (!data.authenticated || data.user?.role !== 'student') {
+                    excuseTab.innerHTML = `<p class="muted">To submit or update an excuse, please <a href="/login.html">log in</a> as a student.</p>`;
+                } else {
+                    // If authenticated student, show a minimal submit form (handled by student dashboard normally)
+                    excuseTab.innerHTML = `
+                        <div class="excuse-form-wrapper">
+                        <form id="publicExcuseForm">
+                            <div class="excuse-grid">
+                                <div class="form-group">
+                                    <label for="pExcuseDate">Date</label>
+                                    <input type="date" id="pExcuseDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pExcuseReason">Reason <small class="muted">(<span id="pReasonCounter">0</span>/500)</small></label>
+                                    <textarea id="pExcuseReason" maxlength="500" required placeholder="Briefly explain your reason (max 500 characters)"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-row" style="justify-content: flex-end; margin-top:12px;"><button class="btn" type="submit">Submit</button></div>
+                        </form>
+                        </div>
+                    `;
+                    // Set default date
+                    const pDateField = document.getElementById('pExcuseDate');
+                    const pReasonField = document.getElementById('pExcuseReason');
+                    const pCounter = document.getElementById('pReasonCounter');
+                    pDateField.value = getTodayDateString();
+
+                    const updatePCounter = () => { pCounter.textContent = pReasonField.value.length; };
+                    pReasonField.addEventListener('input', updatePCounter);
+                    updatePCounter();
+
+                    document.getElementById('publicExcuseForm').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const date = pDateField.value;
+                        const reason = pReasonField.value.trim();
+                        if (!date || !reason) return showMessage('Date and reason are required.', 'error');
+
+                        const publicForm = document.getElementById('publicExcuseForm');
+                        const submitBtn = publicForm.querySelector('button');
+                        const origHtml = submitBtn.innerHTML;
+                        submitBtn.disabled = true; submitBtn.classList.add('loading');
+                        submitBtn.innerHTML = `<span class="spinner" aria-hidden="true"></span> Submitting...`;
+
+                        const resp = await apiFetch('/api/student/excuse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, reason }) });
+                        if (resp && resp.success) {
+                            submitBtn.classList.remove('loading');
+                            submitBtn.classList.add('success');
+                            submitBtn.innerHTML = '&#10003; Submitted';
+
+                            showMessage(resp.data.message || 'Excuse submitted.');
+                            pReasonField.value = '';
+                            updatePCounter();
+                            pDateField.value = getTodayDateString();
+
+                            setTimeout(() => { submitBtn.classList.remove('success'); submitBtn.innerHTML = origHtml; submitBtn.disabled = false; }, 1200);
+                        } else {
+                            submitBtn.classList.remove('loading'); submitBtn.innerHTML = origHtml; submitBtn.disabled = false;
+                        }
+                    });
+                }
+            }
+        } catch (err) {
+            // silenty ignore; leave the UI as is
+        }
     };
 
     viewStatusForm.addEventListener('submit', async (e) => {
