@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Student Registration - Attendance System</title>
+    <link rel="icon" href="/icons/school-icon.jpeg" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+
+    <div class="login-wrapper">
+        <div class="login-branding">
+            <div class="branding-content">
+                <img src="/icons/school-icon.jpeg" alt="School logo" class="branding-logo">
+                <h1>ZDSPGC</h1>
+                <p>Web-Based Student Attendance</p>
+            </div>
+        </div>
+        <div class="login-form-container">
+            <div class="login-inner-card" style="max-width: 500px;">
+                <h2>Student Registration</h2>
+                <p>Fill in your details to request an account.</p>
+                <form id="signupForm">
+                    <div id="signupError" class="form-error" style="display: none;"></div>
+                    <div id="signupSuccess" class="form-success" style="display: none;"></div>
+                    
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="name" required placeholder="e.g. Juan Dela Cruz">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label>Age</label>
+                            <input type="number" id="age" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Gender</label>
+                            <select id="gender" required>
+                                <option value="">Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label>Course</label>
+                            <select id="course" required>
+                                <option value="">Loading courses...</option>
+                            </select>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Year Level</label>
+                            <select id="yearLevel" required>
+                                <option value="">Select</option>
+                                <option value="1st Year">1st Year</option>
+                                <option value="2nd Year">2nd Year</option>
+                                <option value="3rd Year">3rd Year</option>
+                                <option value="4th Year">4th Year</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" required placeholder="Choose a username">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" required placeholder="Choose a password">
+                    </div>
+
+                    <button type="submit" class="btn btn-full btn-green">Register</button>
+                </form>
+                <div class="login-footer">
+                    <a href="/login.html">Back to Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="toastContainer"></div>
+
+    <script type="module">
+        import { apiFetch, showMessage } from './utils.js';
+
+        const form = document.getElementById('signupForm');
+        const courseSelect = document.getElementById('course');
+        const errorDiv = document.getElementById('signupError');
+
+        // Load courses
+        (async () => {
+            const response = await apiFetch('/api/public/courses');
+            if (response && response.success) {
+                courseSelect.innerHTML = '<option value="">Select Course</option>';
+                response.data.forEach(c => {
+                    courseSelect.innerHTML += `<option value="${c.id}">${c.code} - ${c.name}</option>`;
+                });
+            }
+        })();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorDiv.style.display = 'none';
+            const btn = form.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const data = {
+                name: document.getElementById('name').value,
+                age: document.getElementById('age').value,
+                gender: document.getElementById('gender').value,
+                course_id: document.getElementById('course').value,
+                year_level: document.getElementById('yearLevel').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value
+            };
+
+            const response = await apiFetch('/api/student-signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response && response.success) {
+                showMessage(response.data.message);
+                form.reset();
+            } else {
+                errorDiv.textContent = 'Registration failed. Please check the error message.';
+                errorDiv.style.display = 'block';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Register';
+        });
+    </script>
+</body>
+</html>

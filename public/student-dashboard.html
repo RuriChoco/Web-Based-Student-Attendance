@@ -9,40 +9,297 @@
     <title>Student Dashboard - Attendance System</title>
     <link rel="icon" href="/icons/school-icon.jpeg" />
     <link rel="stylesheet" href="style.css">
+    <style>
+        .announcement-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .announcement-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            display: block;
+        }
+        .stat-box {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <img src="/icons/school-icon.jpeg" alt="School logo" class="sidebar-logo">
-                <h3 id="studentNameDisplay" style="display:inline-block;vertical-align:middle;margin:0;">Student</h3>
-                <span id="studentCodeDisplay" class="role-badge" style="display:block;margin-top:6px;"></span>
+                <h3>Student Portal</h3>
+                <span class="role-badge">Student</span>
             </div>
             <nav class="sidebar-nav">
-                <a href="#" class="nav-link active" data-section="summary">My Summary</a>
-                <a href="#" class="nav-link" data-section="excuse">Submit Excuse</a>
-                <a href="#" class="nav-link" data-section="password">Change Password</a>
+                <a href="#" class="nav-link active" data-section="dashboard">Dashboard</a>
+                <a href="#" class="nav-link" data-section="excuses">Excuses</a>
+                <a href="#" class="nav-link" data-section="settings">Settings</a>
             </nav>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="btn btn-red">Logout</button>
             </div>
         </aside>
-        <main class="main-content" id="mainContent">
+        <main class="main-content">
             <header class="mobile-header">
                 <button id="menuToggleBtn" class="menu-toggle">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+                    <span></span><span></span><span></span>
                 </button>
-                <h3 id="mobileHeaderTitle">My Summary</h3>
+                <h3>Dashboard</h3>
             </header>
+            
             <div id="dynamicContentContainer">
-                <!-- Content will be loaded here by JavaScript -->
+                <!-- Dashboard Section -->
+                <div id="dashboardSection">
+                    <div class="card">
+                        <h2 id="welcomeMsg">Welcome!</h2>
+                        <p>Here is your attendance summary.</p>
+                        <div class="stats-grid" style="margin-top: 20px;">
+                            <div class="stat-box">
+                                <div class="stat-number" id="statPresent">0</div>
+                                <div>Present</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" id="statAbsent" style="color: var(--red);">0</div>
+                                <div>Absent</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" id="statLate" style="color: var(--orange);">0</div>
+                                <div>Late</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Announcements</h3>
+                        <div id="announcementsContainer">
+                            <div class="loader">Loading announcements...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Excuses Section -->
+                <div id="excusesSection" style="display: none;">
+                    <div class="card">
+                        <h3>Submit Excuse Letter</h3>
+                        <form id="excuseForm">
+                            <div class="form-group">
+                                <label>Date of Absence</label>
+                                <input type="date" id="excuseDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Reason</label>
+                                <textarea id="excuseReason" required placeholder="Explain why you were absent..." style="min-height: 100px;"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-green">Submit Excuse</button>
+                        </form>
+                    </div>
+                    <div class="card">
+                        <h3>My Excuses</h3>
+                        <div class="table-wrapper">
+                            <table id="excusesTable"><thead><tr><th>Date</th><th>Reason</th><th>Status</th></tr></thead><tbody></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Section -->
+                <div id="settingsSection" style="display: none;">
+                    <div class="card">
+                        <h3>Change Password</h3>
+                        <form id="changePasswordForm">
+                            <div class="form-group">
+                                <label>Current Password</label>
+                                <input type="password" id="currentPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label>New Password</label>
+                                <input type="password" id="newPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Confirm New Password</label>
+                                <input type="password" id="confirmPassword" required>
+                            </div>
+                            <button type="submit" class="btn btn-green">Update Password</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
-
     <div id="toastContainer"></div>
-    <script type="module" src="student-dashboard.js"></script>
+
+    <script type="module">
+        import { apiFetch, showMessage, getLoadingHTML } from './utils.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check Session
+            const sessionRes = await apiFetch('/api/session');
+            if (!sessionRes || !sessionRes.success || !sessionRes.data.authenticated) {
+                window.location.href = '/login.html';
+                return;
+            }
+            const user = sessionRes.data.user;
+            document.getElementById('welcomeMsg').textContent = `Welcome, ${user.name}!`;
+
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                await apiFetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login.html';
+            });
+
+            // Navigation Logic
+            const navLinks = document.querySelectorAll('.sidebar-nav .nav-link');
+            const sections = {
+                'dashboard': document.getElementById('dashboardSection'),
+                'excuses': document.getElementById('excusesSection'),
+                'settings': document.getElementById('settingsSection')
+            };
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // Update active link
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    // Show target section
+                    const target = e.target.dataset.section;
+                    Object.values(sections).forEach(sec => sec.style.display = 'none');
+                    if (sections[target]) {
+                        sections[target].style.display = 'block';
+                        if (target === 'excuses') loadExcuses();
+                    }
+                });
+            });
+
+            // Load Attendance Summary
+            const today = new Date();
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(today.getDate() - 30);
+            
+            const summaryRes = await apiFetch(`/api/student/summary?start=${thirtyDaysAgo.toISOString().split('T')[0]}&end=${today.toISOString().split('T')[0]}`);
+            if (summaryRes && summaryRes.success) {
+                const stats = summaryRes.data;
+                document.getElementById('statPresent').textContent = stats.Present || 0;
+                document.getElementById('statAbsent').textContent = stats.Absent || 0;
+                document.getElementById('statLate').textContent = stats.Late || 0;
+            }
+
+            // Load Announcements
+            const annRes = await apiFetch('/api/announcements');
+            const annContainer = document.getElementById('announcementsContainer');
+            annContainer.innerHTML = '';
+            
+            if (annRes && annRes.success && annRes.data.length > 0) {
+                annRes.data.forEach(a => {
+                    const div = document.createElement('div');
+                    div.className = 'announcement-card';
+                    div.innerHTML = `
+                        <h4 style="margin: 0 0 5px 0; font-size: 18px;">${a.title}</h4>
+                        <span class="announcement-meta">Posted by ${a.author_name} on ${new Date(a.created_at).toLocaleDateString()}</span>
+                        <p style="margin: 0; line-height: 1.5;">${a.content}</p>
+                    `;
+                    annContainer.appendChild(div);
+                });
+            } else {
+                annContainer.innerHTML = '<p>No announcements at this time.</p>';
+            }
+
+            // Excuses Logic
+            const excuseForm = document.getElementById('excuseForm');
+            const excusesTableBody = document.getElementById('excusesTable').querySelector('tbody');
+
+            async function loadExcuses() {
+                excusesTableBody.innerHTML = getLoadingHTML(3);
+                const response = await apiFetch('/api/student/excuses');
+                if (response && response.success) {
+                    const excuses = response.data;
+                    excusesTableBody.innerHTML = '';
+                    if (excuses.length === 0) {
+                        excusesTableBody.innerHTML = '<tr><td colspan="3">No excuses submitted.</td></tr>';
+                        return;
+                    }
+                    excuses.forEach(exc => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${exc.date}</td>
+                            <td>${exc.reason}</td>
+                            <td><span class="status-${exc.status}">${exc.status}</span></td>
+                        `;
+                        excusesTableBody.appendChild(tr);
+                    });
+                } else {
+                    excusesTableBody.innerHTML = '<tr><td colspan="3">Error loading excuses.</td></tr>';
+                }
+            }
+
+            excuseForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = excuseForm.querySelector('button');
+                btn.disabled = true;
+                
+                const data = {
+                    date: document.getElementById('excuseDate').value,
+                    reason: document.getElementById('excuseReason').value
+                };
+
+                const response = await apiFetch('/api/student/excuse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response && response.success) {
+                    showMessage('Excuse submitted successfully.');
+                    excuseForm.reset();
+                    loadExcuses();
+                }
+                btn.disabled = false;
+            });
+
+            // Settings Logic
+            const changePasswordForm = document.getElementById('changePasswordForm');
+            changePasswordForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+
+                if (newPassword !== confirmPassword) {
+                    showMessage('New passwords do not match.', 'error');
+                    return;
+                }
+
+                const btn = changePasswordForm.querySelector('button');
+                btn.disabled = true;
+
+                const response = await apiFetch('/api/user/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+
+                if (response && response.success) {
+                    showMessage('Password updated successfully.');
+                    changePasswordForm.reset();
+                }
+                btn.disabled = false;
+            });
+        });
+    </script>
 </body>
 </html>

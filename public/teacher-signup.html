@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Teacher Registration - Attendance System</title>
+    <link rel="icon" href="/icons/school-icon.jpeg" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+
+    <div class="login-wrapper">
+        <div class="login-branding">
+            <div class="branding-content">
+                <img src="/icons/school-icon.jpeg" alt="School logo" class="branding-logo">
+                <h1>ZDSPGC</h1>
+                <p>Web-Based Student Attendance</p>
+            </div>
+        </div>
+        <div class="login-form-container">
+            <div class="login-inner-card" style="max-width: 500px;">
+                <h2>Teacher Registration</h2>
+                <p>Create a teacher account.</p>
+                <form id="signupForm">
+                    <div id="signupError" class="form-error" style="display: none;"></div>
+                    
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="name" required placeholder="e.g. Maria Clara">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" required placeholder="Choose a username">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" required placeholder="Choose a password">
+                    </div>
+
+                    <button type="submit" class="btn btn-full btn-green">Register</button>
+                </form>
+                <div class="login-footer">
+                    <a href="/login.html">Back to Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="toastContainer"></div>
+
+    <script type="module">
+        import { apiFetch, showMessage } from './utils.js';
+
+        const form = document.getElementById('signupForm');
+        const errorDiv = document.getElementById('signupError');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorDiv.style.display = 'none';
+            const btn = form.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const data = {
+                name: document.getElementById('name').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value
+            };
+
+            const response = await apiFetch('/api/staff-signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response && response.success) {
+                showMessage(response.data.message);
+                form.reset();
+            } else {
+                errorDiv.textContent = 'Registration failed. Please check the error message.';
+                errorDiv.style.display = 'block';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Register';
+        });
+    </script>
+</body>
+</html>

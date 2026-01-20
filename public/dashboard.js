@@ -71,7 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <li><strong>Name:</strong> ${profile.details.name}</li>
                     <li><strong>Age:</strong> ${profile.details.age}</li>
                     <li><strong>Gender:</strong> ${profile.details.gender}</li>
-                    <li><strong>Room:</strong> ${profile.details.room}</li>
                 </ul>
             </div>
 
@@ -176,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dynamicContentContainer.innerHTML = `
             <div class="card">
                 <h3>Bulk Upload Students</h3>
-                <p>Upload a CSV file with columns: <strong>name, age, gender, room, student_code (optional)</strong>. The first row must be the header.</p>
+                <p>Upload a CSV file with columns: <strong>name, age, gender, student_code (optional)</strong>. The first row must be the header.</p>
                 <form id="bulkUploadForm">
                     <div class="form-row">
                         <div class="form-group flex-2">
@@ -193,12 +192,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h3>Registered Students</h3>
                     <button id="addStudentBtn" class="btn">Add New Student</button>
                 </div>
-                <div class="form-row" style="margin-bottom: 0;">
-                    <label for="searchStudentInput">Search:</label>
-                    <input type="text" id="searchStudentInput" placeholder="Filter by name...">
+                <div class="form-row" style="margin-bottom: 12px;">
+                    <div class="form-group flex-1">
+                        <label for="searchStudentInput">Search:</label>
+                        <input type="text" id="searchStudentInput" placeholder="Filter by name...">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="filterYearLevel">Year Level:</label>
+                        <select id="filterYearLevel">
+                            <option value="">All Years</option>
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="4th Year">4th Year</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="filterCourse">Course:</label>
+                        <select id="filterCourse">
+                            <option value="">All Courses</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="table-wrapper">
-                    <table id="studentsTable"><thead><tr><th>CODE</th><th>NAME</th><th>AGE</th><th>GENDER</th><th>ROOM</th><th>ACTION</th></tr></thead><tbody></tbody></table>
+                    <table id="studentsTable"><thead><tr><th>CODE</th><th>NAME</th><th>AGE</th><th>GENDER</th><th>YEAR</th><th>ACTION</th></tr></thead><tbody></tbody></table>
                 </div>
                 <div id="paginationControls" class="form-row" style="justify-content: center; margin-top: 12px; display: none;">
                     <button id="prevPageBtn" class="btn">Previous</button>
@@ -231,6 +248,20 @@ document.addEventListener('DOMContentLoaded', () => {
         initAttendance();
     };
 
+    const loadRoomsSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h3>Manage Rooms</h3>
+                    <button id="addRoomBtn" class="btn">Add New Room</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="roomsTable"><thead><tr><th>Room Name</th><th>Room Number</th><th>Actions</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>`;
+        initRooms();
+    };
+
     const loadExcusesSection = () => {
         dynamicContentContainer.innerHTML = `
             <div class="card">
@@ -259,6 +290,29 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         initExcuses();
+    };
+
+    const loadAnnouncementsSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Post Announcement</h3>
+                <form id="announcementForm">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="announcementTitle" required placeholder="Announcement Title">
+                    </div>
+                    <div class="form-group">
+                        <label>Content</label>
+                        <textarea id="announcementContent" required placeholder="Write your announcement here..." style="min-height: 100px;"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-green">Post Announcement</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>Recent Announcements</h3>
+                <div id="announcementsList"></div>
+            </div>`;
+        initAnnouncements();
     };
 
     const loadStaffSection = () => {
@@ -392,8 +446,20 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'attendance':
                 loadAttendanceSection();
                 break;
+            case 'courses':
+                loadCoursesSection();
+                break;
+            case 'rooms':
+                loadRoomsSection();
+                break;
+            case 'registrations':
+                loadRegistrationsSection();
+                break;
             case 'excuses':
                 loadExcusesSection();
+                break;
+            case 'announcements':
+                loadAnnouncementsSection();
                 break;
             case 'history':
                 loadHistorySection();
@@ -427,9 +493,9 @@ document.addEventListener('DOMContentLoaded', () => {
         userRoleBadge.textContent = user.role;
 
         const rolePermissions = {
-            admin: ['dashboard', 'students', 'attendance', 'excuses', 'history', 'password', 'staff', 'audit'],
+            admin: ['dashboard', 'students', 'attendance', 'courses', 'rooms', 'registrations', 'excuses', 'announcements', 'history', 'password', 'staff', 'audit'],
             registrar: ['dashboard', 'students', 'password'],
-            teacher: ['dashboard', 'attendance', 'excuses', 'history', 'password']
+            teacher: ['dashboard', 'attendance', 'excuses', 'announcements', 'history', 'password']
         };
 
         const allowedSections = rolePermissions[user.role] || [];
@@ -459,14 +525,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentStudentPage = 1;
     let currentStudentSearch = '';
+    let currentStudentYear = '';
+    let currentStudentCourse = '';
 
-    const renderStudentsTable = async (page = 1, searchTerm = '') => {
+    const renderStudentsTable = async (page = 1, searchTerm = '', yearLevel = '', courseId = '') => {
         currentStudentPage = page;
         currentStudentSearch = searchTerm;
+        currentStudentYear = yearLevel;
+        currentStudentCourse = courseId;
         const tbody = document.getElementById('studentsTable').querySelector('tbody');
         tbody.innerHTML = getLoadingHTML(6);
 
-        const response = await apiFetch(`/api/students?page=${page}&limit=10&search=${searchTerm}`);
+        const response = await apiFetch(`/api/students?page=${page}&limit=10&search=${searchTerm}&year_level=${yearLevel}&course_id=${courseId}`);
         if (!response || !response.success) return;
 
         const { students, pagination } = response.data;
@@ -483,11 +553,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const tr = document.createElement('tr');
             tr.className = s.gender === 'Male' ? 'gender-m' : 'gender-f';
             const actionButtons = canEdit ? `
-                <button class="btn btn-green" data-action="edit" data-code="${s.student_code}" data-name="${s.name}" data-age="${s.age}" data-gender="${s.gender}" data-room="${s.room}">Edit</button>
+                <button class="btn btn-green" data-action="edit" data-code="${s.student_code}" data-name="${s.name}" data-age="${s.age}" data-gender="${s.gender}" data-year="${s.year_level || ''}">Edit</button>
                 <button class="btn btn-red" data-action="delete" data-code="${s.student_code}" data-name="${s.name}">Delete</button>
             ` : '<span>View Only</span>';
             tr.innerHTML = `
-                <td>${s.student_code}</td><td><a href="#" class="link-style" data-action="view-profile" data-code="${s.student_code}">${s.name}</a></td><td>${s.age}</td><td>${s.gender}</td><td>${s.room}</td>
+                <td>${s.student_code}</td><td><a href="#" class="link-style" data-action="view-profile" data-code="${s.student_code}">${s.name}</a></td><td>${s.age}</td><td>${s.gender}</td><td>${s.year_level || '-'}</td>
                 <td>${actionButtons}</td>`;
             tbody.appendChild(tr);
         });
@@ -509,9 +579,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initStudents = () => {
         const searchInput = document.getElementById('searchStudentInput');
+        const filterYearLevel = document.getElementById('filterYearLevel');
+        const filterCourse = document.getElementById('filterCourse');
         const studentsTable = document.getElementById('studentsTable');
         const paginationControls = document.getElementById('paginationControls');
         const addStudentBtn = document.getElementById('addStudentBtn');
+
+        // Populate Course Filter
+        (async () => {
+            const response = await apiFetch('/api/courses');
+            if (response && response.success) {
+                filterCourse.innerHTML = '<option value="">All Courses</option>';
+                response.data.forEach(c => {
+                    filterCourse.innerHTML += `<option value="${c.id}">${c.code} - ${c.name}</option>`;
+                });
+            }
+        })();
 
         // Modal elements
         const modal = document.getElementById('studentFormModal');
@@ -520,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cancelBtn = document.getElementById('cancelStudentFormBtn');
         const editCodeInput = form.querySelector('#editStudentCode');
 
-        const openModal = (studentData = null) => {
+        const openModal = async (studentData = null) => {
             form.reset();
             const stuCodeInput = form.querySelector('#stuCode');
             const manualCodeInput = form.querySelector('#manualStudentCode');
@@ -531,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 stuCodeInput.value = studentData.code;
                 form.querySelector('#stuAge').value = studentData.age;
                 form.querySelector('#stuGender').value = studentData.gender;
-                form.querySelector('#stuRoom').value = studentData.room;
+                form.querySelector('#stuYearLevel').value = studentData.year;
 
                 // Show student code input and make it active for validation
                 form.querySelector('#manualStudentCodeGroup').style.display = 'none';
@@ -565,14 +648,17 @@ document.addEventListener('DOMContentLoaded', () => {
         addStudentBtn.addEventListener('click', () => openModal());
         cancelBtn.addEventListener('click', closeModal);
         window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-
-        searchInput.addEventListener('input', debounce((e) => renderStudentsTable(1, e.target.value), 300));
+        
+        const refreshTable = () => renderStudentsTable(1, searchInput.value, filterYearLevel.value, filterCourse.value);
+        searchInput.addEventListener('input', debounce(refreshTable, 300));
+        filterYearLevel.addEventListener('change', refreshTable);
+        filterCourse.addEventListener('change', refreshTable);
 
         paginationControls.addEventListener('click', (e) => {
             if (e.target.id === 'prevPageBtn') {
-                if (currentStudentPage > 1) renderStudentsTable(currentStudentPage - 1, currentStudentSearch);
+                if (currentStudentPage > 1) renderStudentsTable(currentStudentPage - 1, currentStudentSearch, currentStudentYear, currentStudentCourse);
             } else if (e.target.id === 'nextPageBtn') {
-                renderStudentsTable(currentStudentPage + 1, currentStudentSearch);
+                renderStudentsTable(currentStudentPage + 1, currentStudentSearch, currentStudentYear, currentStudentCourse);
             }
         });
 
@@ -584,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: form.querySelector('#stuName').value.trim(),
                 age: form.querySelector('#stuAge').value,
                 gender: form.querySelector('#stuGender').value,
-                room: form.querySelector('#stuRoom').value.trim(),
+                year_level: form.querySelector('#stuYearLevel').value,
                 student_code: form.querySelector('#stuCode').value.trim(), // For edits
             };
             const editCode = editCodeInput.value;
@@ -603,25 +689,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 showMessage(editCode ? 'Student updated successfully.' : 'Student added successfully.');
                 closeModal();
                 searchInput.value = '';
-                renderStudentsTable(1, '');
+                refreshTable();
             }
             submitBtn.disabled = false;
         });
 
         studentsTable.addEventListener('click', async (e) => {
             if (!e.target.matches('button, a')) return;
-            const { action, code, name, age, gender, room } = e.target.dataset;
+            const { action, code, name, age, gender, year } = e.target.dataset;
 
             if (action === 'delete') {
                 if (confirm(`Are you sure you want to delete ${name} (${code})? This action is permanent.`)) {
                     const result = await apiFetch(`/api/students/${code}`, { method: 'DELETE' });
                     if (result) {
                         showMessage('Student deleted.');
-                        renderStudentsTable(1, '');
+                        refreshTable();
                     }
                 }
             } else if (action === 'edit') {
-                openModal({ code, name, age, gender, room });
+                openModal({ code, name, age, gender, year });
             } else if (action === 'view-profile') {
                 e.preventDefault();
                 openProfileModal(code);
@@ -683,9 +769,66 @@ document.addEventListener('DOMContentLoaded', () => {
     const initAttendance = () => {
         const selectDateField = document.getElementById('selectDate');
         const attendanceBody = document.getElementById('attendanceBody');
+        const attendanceTitle = document.querySelector('#attendanceDateDisplay').parentNode; // Parent h4
         const dateDisplay = document.getElementById('attendanceDateDisplay');
         const exportBtn = document.getElementById('exportCsvBtn');
         
+        let currentCourse = null;
+        let currentCourseName = '';
+
+        // Add Select Course Button dynamically to the header
+        const headerRow = document.querySelector('.card .form-row:nth-of-type(2)');
+        if (headerRow && !document.getElementById('selectCourseBtn')) {
+            const selectCourseBtn = document.createElement('button');
+            selectCourseBtn.id = 'selectCourseBtn';
+            selectCourseBtn.className = 'btn';
+            selectCourseBtn.textContent = 'Select Course';
+            selectCourseBtn.style.marginRight = '10px';
+            headerRow.insertBefore(selectCourseBtn, exportBtn);
+
+            // Course Selection Modal Logic
+            const courseModal = document.getElementById('courseSelectionModal');
+            const courseSelect = document.getElementById('selectedCourseId');
+            const cancelCourseBtn = document.getElementById('cancelCourseSelectionBtn');
+
+            const populateCourses = async () => {
+                const response = await apiFetch('/api/courses');
+                if (response && response.success) {
+                    courseSelect.innerHTML = '<option value="">Select a course...</option>';
+                    response.data.forEach(course => {
+                        const option = document.createElement('option');
+                        option.value = course.id;
+                        option.textContent = `${course.code} - ${course.name}`;
+                        courseSelect.appendChild(option);
+                    });
+                }
+            };
+
+            selectCourseBtn.addEventListener('click', async () => {
+                await populateCourses();
+                courseModal.style.display = 'flex';
+            });
+
+            const closeCourseModal = () => {
+                courseModal.style.display = 'none';
+            };
+
+            cancelCourseBtn.addEventListener('click', closeCourseModal);
+            
+            // Handle Course Confirmation
+            const courseSelectionForm = document.getElementById('courseSelectionForm');
+            courseSelectionForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                currentCourse = courseSelect.value;
+                currentCourseName = courseSelect.options[courseSelect.selectedIndex].text;
+                if (currentCourse) {
+                    attendanceTitle.innerHTML = `Attendance for <span id="attendanceDateDisplay">${selectDateField.value}</span> in <strong>${currentCourseName}</strong>`;
+                    loadAttendanceByDate();
+                }
+                closeCourseModal();
+            });
+        }
+
         const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
         const loadAttendanceByDate = async () => {
@@ -694,16 +837,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 attendanceBody.innerHTML = '<tr><td colspan="4">Select a date to view attendance.</td></tr>';
                 return;
             }
-            dateDisplay.textContent = date;
+            
+            const displayDate = document.getElementById('attendanceDateDisplay');
+            if (displayDate) displayDate.textContent = date;
+
             attendanceBody.innerHTML = getLoadingHTML(4);
 
-            const response = await apiFetch(`/api/attendance/${date}`);
+            if (!currentCourse) {
+                attendanceBody.innerHTML = '<tr><td colspan="4">Please select a course to view attendance.</td></tr>';
+                return;
+            }
+
+            // Append course to query
+            const url = `/api/attendance/${date}?course_id=${currentCourse}`;
+
+            const response = await apiFetch(url);
             if (!response || !response.success) return;
 
             const attendanceList = response.data || [];
             attendanceBody.innerHTML = '';
             if (attendanceList.length === 0) {
-                attendanceBody.innerHTML = '<tr><td colspan="4">No students registered to take attendance.</td></tr>';
+                attendanceBody.innerHTML = '<tr><td colspan="4">No students enrolled in this course.</td></tr>';
                 return;
             }
             attendanceList.forEach(rec => {
@@ -735,6 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const update = {
                     student_code: select.dataset.code,
                     date: select.dataset.date,
+                    course_id: currentCourse,
                     status: select.value
                 };
                 const result = await apiFetch('/api/attendance', {
@@ -751,10 +906,471 @@ document.addEventListener('DOMContentLoaded', () => {
                 showMessage('Please select a date to export.', 'error');
                 return;
             }
-            window.location.href = `/api/attendance/${date}/csv`;
+            window.location.href = `/api/attendance/${date}/csv?course_id=${currentCourse || ''}`;
         });
         selectDateField.value = getTodayDateString();
-        loadAttendanceByDate();
+        // Don't load immediately, wait for course selection
+        attendanceBody.innerHTML = '<tr><td colspan="4">Please select a course to view attendance.</td></tr>';
+    };
+
+    // --- Courses Management Logic ---
+
+    const loadCoursesSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h3>Manage Courses</h3>
+                    <button id="addCourseBtn" class="btn">Add New Course</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="coursesTable"><thead><tr><th>Code</th><th>Name</th><th>Room</th><th>Schedule</th><th>Actions</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>`;
+        initCourses();
+    };
+
+    const initCourses = () => {
+        const tableBody = document.getElementById('coursesTable').querySelector('tbody');
+        const addBtn = document.getElementById('addCourseBtn');
+        const modal = document.getElementById('courseFormModal');
+        const form = document.getElementById('courseForm');
+        const cancelBtn = document.getElementById('cancelCourseFormBtn');
+        const formTitle = document.getElementById('courseFormTitle');
+        const courseCodeInput = document.getElementById('courseCode');
+        const courseNameInput = document.getElementById('courseName');
+        const courseRoomSelect = document.getElementById('courseRoom');
+        const courseStartTime = document.getElementById('courseStartTime');
+        const courseEndTime = document.getElementById('courseEndTime');
+        const editIdInput = document.getElementById('editCourseId');
+
+        // Enrollment Modal Elements
+        const enrollmentModal = document.getElementById('enrollmentModal');
+        const enrollmentTableBody = document.getElementById('enrollmentTable').querySelector('tbody');
+        const closeEnrollmentBtn = document.getElementById('closeEnrollmentBtn');
+        const enrollmentSearch = document.getElementById('enrollmentSearch');
+        let currentEnrollmentCourseId = null;
+
+        const populateRooms = async () => {
+            const response = await apiFetch('/api/rooms');
+            if (response && response.success) {
+                courseRoomSelect.innerHTML = '<option value="">None</option>';
+                response.data.forEach(room => {
+                    const option = document.createElement('option');
+                    option.value = room.id;
+                    option.textContent = `${room.name} (${room.room_number})`;
+                    courseRoomSelect.appendChild(option);
+                });
+            }
+        };
+
+        const renderCourses = async () => {
+            tableBody.innerHTML = getLoadingHTML(2);
+            const response = await apiFetch('/api/courses');
+            if (!response || !response.success) {
+                tableBody.innerHTML = '<tr><td colspan="5">Error loading courses.</td></tr>';
+                return;
+            }
+            const courses = response.data;
+            tableBody.innerHTML = '';
+            if (courses.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5">No courses found.</td></tr>';
+                return;
+            }
+            courses.forEach(course => {
+                const roomDisplay = course.room_name ? `${course.room_name} (${course.room_number})` : 'None';
+                const scheduleDisplay = (course.days && course.start_time) ? `${course.days} ${course.start_time}-${course.end_time}` : 'No Schedule';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${course.code}</td>
+                    <td>${course.name}</td>
+                    <td>${roomDisplay}</td>
+                    <td>${scheduleDisplay}</td>
+                    <td>
+                        <button class="btn" style="background-color: var(--blue);" data-action="enroll" data-id="${course.id}" data-name="${course.name}">Students</button>
+                        <button class="btn btn-green" data-action="edit" data-id="${course.id}">Edit</button>
+                        <button class="btn btn-red" data-action="delete" data-id="${course.id}" data-name="${course.name}">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        };
+
+        const openModal = async (course = null) => {
+            await populateRooms();
+            if (course) {
+                formTitle.textContent = 'Edit Course';
+                editIdInput.value = course.id;
+                courseCodeInput.value = course.code;
+                courseNameInput.value = course.name;
+                courseRoomSelect.value = course.room;
+                courseStartTime.value = course.start_time || '';
+                courseEndTime.value = course.end_time || '';
+                
+                // Set checkboxes
+                const days = course.days ? course.days.split(',') : [];
+                document.querySelectorAll('input[name="courseDays"]').forEach(cb => {
+                    cb.checked = days.includes(cb.value);
+                });
+            } else {
+                formTitle.textContent = 'Add New Course';
+                editIdInput.value = '';
+                courseCodeInput.value = '';
+                courseNameInput.value = '';
+                courseRoomSelect.value = '';
+                courseStartTime.value = '';
+                courseEndTime.value = '';
+                document.querySelectorAll('input[name="courseDays"]').forEach(cb => {
+                    cb.checked = false;
+                });
+            }
+            modal.style.display = 'flex';
+        };
+
+        const closeModal = () => {
+            modal.style.display = 'none';
+            form.reset();
+        };
+
+        addBtn.addEventListener('click', () => openModal());
+        cancelBtn.addEventListener('click', closeModal);
+        window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        closeEnrollmentBtn.addEventListener('click', () => { enrollmentModal.style.display = 'none'; });
+        window.addEventListener('click', (e) => { if (e.target === enrollmentModal) enrollmentModal.style.display = 'none'; });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = editIdInput.value;
+            const code = courseCodeInput.value.trim();
+            const name = courseNameInput.value.trim();
+            const room_id = courseRoomSelect.value;
+            const start_time = courseStartTime.value;
+            const end_time = courseEndTime.value;
+            const days = Array.from(document.querySelectorAll('input[name="courseDays"]:checked'))
+                .map(cb => cb.value).join(',');
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/courses/${id}` : '/api/courses';
+
+            const result = await apiFetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, name, room_id, start_time, end_time, days })
+            });
+
+            if (result && result.success) {
+                showMessage(id ? 'Course updated.' : 'Course added.');
+                closeModal();
+                renderCourses();
+            }
+        });
+
+        tableBody.addEventListener('click', async (e) => {
+            if (!e.target.matches('button')) return;
+            const { action, id, name } = e.target.dataset;
+            if (action === 'edit') {
+                // Fetch latest details to ensure we have schedule info
+                const response = await apiFetch('/api/courses');
+                const course = response.data.find(c => c.id == id);
+                openModal({ ...course, room: course.room_id });
+            } else if (action === 'delete') {
+                if (confirm(`Delete course "${name}"?`)) {
+                    const result = await apiFetch(`/api/courses/${id}`, { method: 'DELETE' });
+                    if (result && result.success) {
+                        showMessage('Course deleted.');
+                        renderCourses();
+                    }
+                }
+            } else if (action === 'enroll') {
+                openEnrollmentModal(id, name);
+            }
+        });
+
+        // Enrollment Logic
+        const openEnrollmentModal = async (courseId, courseName) => {
+            currentEnrollmentCourseId = courseId;
+            document.getElementById('enrollmentTitle').textContent = `Manage Enrollment: ${courseName}`;
+            enrollmentModal.style.display = 'flex';
+            await renderEnrollmentList();
+        };
+
+        const renderEnrollmentList = async (search = '') => {
+            enrollmentTableBody.innerHTML = getLoadingHTML(4);
+            const response = await apiFetch(`/api/courses/${currentEnrollmentCourseId}/students?search=${search}`);
+            if (!response || !response.success) {
+                enrollmentTableBody.innerHTML = '<tr><td colspan="4">Error loading students.</td></tr>';
+                return;
+            }
+            const students = response.data;
+            enrollmentTableBody.innerHTML = '';
+            if (students.length === 0) {
+                enrollmentTableBody.innerHTML = '<tr><td colspan="4">No students found.</td></tr>';
+                return;
+            }
+
+            students.forEach(s => {
+                const tr = document.createElement('tr');
+                const isEnrolled = s.is_enrolled === 1;
+                tr.innerHTML = `
+                    <td>${s.student_code}</td>
+                    <td>${s.name}</td>
+                    <td>${isEnrolled ? '<span class="status-Present">Enrolled</span>' : '<span class="status-Absent">Not Enrolled</span>'}</td>
+                    <td>
+                        <button class="btn ${isEnrolled ? 'btn-red' : 'btn-green'}" data-id="${s.user_id}" data-action="${isEnrolled ? 'unenroll' : 'enroll'}">
+                            ${isEnrolled ? 'Remove' : 'Add'}
+                        </button>
+                    </td>
+                `;
+                enrollmentTableBody.appendChild(tr);
+            });
+        };
+
+        enrollmentSearch.addEventListener('input', debounce((e) => {
+            renderEnrollmentList(e.target.value);
+        }, 300));
+
+        enrollmentTableBody.addEventListener('click', async (e) => {
+            if (!e.target.matches('button')) return;
+            const { id, action } = e.target.dataset;
+            const button = e.target;
+            button.disabled = true;
+
+            const url = `/api/courses/${currentEnrollmentCourseId}/${action}`;
+            const result = await apiFetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: id })
+            });
+
+            if (result && result.success) {
+                renderEnrollmentList(enrollmentSearch.value);
+            }
+        });
+
+        renderCourses();
+    };
+
+    // --- Rooms Management Logic ---
+
+    const initRooms = () => {
+        const tableBody = document.getElementById('roomsTable').querySelector('tbody');
+        const addBtn = document.getElementById('addRoomBtn');
+        const modal = document.getElementById('roomFormModal');
+        const form = document.getElementById('roomForm');
+        const cancelBtn = document.getElementById('cancelRoomFormBtn');
+        const formTitle = document.getElementById('roomFormTitle');
+        const roomNameInput = document.getElementById('roomName');
+        const roomNumberInput = document.getElementById('roomNumber');
+        const editIdInput = document.getElementById('editRoomId');
+
+        const renderRooms = async () => {
+            tableBody.innerHTML = getLoadingHTML(2);
+            const response = await apiFetch('/api/rooms');
+            if (!response || !response.success) {
+                tableBody.innerHTML = '<tr><td colspan="3">Error loading rooms.</td></tr>';
+                return;
+            }
+            const rooms = response.data;
+            tableBody.innerHTML = '';
+            if (rooms.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3">No rooms found.</td></tr>';
+                return;
+            }
+            rooms.forEach(room => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${room.name}</td>
+                    <td>${room.room_number}</td>
+                    <td>
+                        <button class="btn btn-green" data-action="edit" data-id="${room.id}" data-name="${room.name}" data-number="${room.room_number}">Edit</button>
+                        <button class="btn btn-red" data-action="delete" data-id="${room.id}" data-name="${room.name}">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        };
+
+        const openModal = (room = null) => {
+            if (room) {
+                formTitle.textContent = 'Edit Room';
+                editIdInput.value = room.id;
+                roomNameInput.value = room.name;
+                roomNumberInput.value = room.number;
+            } else {
+                formTitle.textContent = 'Add New Room';
+                editIdInput.value = '';
+                roomNameInput.value = '';
+                roomNumberInput.value = '';
+            }
+            modal.style.display = 'flex';
+        };
+
+        const closeModal = () => {
+            modal.style.display = 'none';
+            form.reset();
+        };
+
+        addBtn.addEventListener('click', () => openModal());
+        cancelBtn.addEventListener('click', closeModal);
+        window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = editIdInput.value;
+            const name = roomNameInput.value.trim();
+            const room_number = roomNumberInput.value.trim();
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/rooms/${id}` : '/api/rooms';
+
+            const result = await apiFetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, room_number })
+            });
+
+            if (result && result.success) {
+                showMessage(id ? 'Room updated.' : 'Room added.');
+                closeModal();
+                renderRooms();
+            }
+        });
+
+        tableBody.addEventListener('click', async (e) => {
+            if (!e.target.matches('button')) return;
+            const { action, id, name, number } = e.target.dataset;
+            if (action === 'edit') {
+                openModal({ id, name, number });
+            } else if (action === 'delete') {
+                if (confirm(`Delete room "${name}"?`)) {
+                    const result = await apiFetch(`/api/rooms/${id}`, { method: 'DELETE' });
+                    if (result && result.success) {
+                        showMessage('Room deleted.');
+                        renderRooms();
+                    }
+                }
+            }
+        });
+
+        renderRooms();
+    };
+
+    // --- Registrations Logic ---
+
+    const loadRegistrationsSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Pending Student Registrations</h3>
+                <div class="table-wrapper">
+                    <table id="registrationsTable"><thead><tr><th>Name</th><th>Username</th><th>Course</th><th>Year</th><th>Action</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Pending Staff Registrations</h3>
+                <div class="table-wrapper">
+                    <table id="staffRegistrationsTable"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Action</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>`;
+
+        const tbody = document.getElementById('registrationsTable').querySelector('tbody');
+        tbody.addEventListener('click', async (e) => {
+            if (!e.target.matches('button')) return;
+            const { action, id } = e.target.dataset;
+            const btn = e.target;
+            btn.disabled = true;
+
+            if (confirm(`Are you sure you want to ${action} this registration?`)) {
+                const result = await apiFetch(`/api/student-registrations/${id}/${action}`, { method: 'POST' });
+                if (result && result.success) {
+                    showMessage(result.data.message);
+                    initRegistrations(); // Reload table
+                } else {
+                    btn.disabled = false;
+                }
+            } else {
+                btn.disabled = false;
+            }
+        });
+
+        const staffTbody = document.getElementById('staffRegistrationsTable').querySelector('tbody');
+        staffTbody.addEventListener('click', async (e) => {
+            if (!e.target.matches('button')) return;
+            const { action, id } = e.target.dataset;
+            const btn = e.target;
+            btn.disabled = true;
+
+            if (confirm(`Are you sure you want to ${action} this staff registration?`)) {
+                const result = await apiFetch(`/api/staff-registrations/${id}/${action}`, { method: 'POST' });
+                if (result && result.success) {
+                    showMessage(result.data.message);
+                    initRegistrations(); // Reload both tables
+                } else {
+                    btn.disabled = false;
+                }
+            } else {
+                btn.disabled = false;
+            }
+        });
+
+        initRegistrations();
+    };
+
+    const initRegistrations = async () => {
+        const tbody = document.getElementById('registrationsTable').querySelector('tbody');
+        tbody.innerHTML = getLoadingHTML(5);
+        const staffTbody = document.getElementById('staffRegistrationsTable').querySelector('tbody');
+        staffTbody.innerHTML = getLoadingHTML(4);
+
+        const response = await apiFetch('/api/student-registrations');
+        if (!response || !response.success) {
+            tbody.innerHTML = '<tr><td colspan="5">Error loading registrations.</td></tr>';
+        } else {
+            const registrations = response.data;
+            tbody.innerHTML = '';
+            if (registrations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No pending registrations.</td></tr>';
+            } else {
+                registrations.forEach(reg => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${reg.name}</td>
+                        <td>${reg.username}</td>
+                        <td>${reg.course_code || 'N/A'}</td>
+                        <td>${reg.year_level}</td>
+                        <td>
+                            <button class="btn btn-green" data-action="approve" data-id="${reg.id}">Approve</button>
+                            <button class="btn btn-red" data-action="reject" data-id="${reg.id}">Reject</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // --- Staff Registrations ---
+        const staffResponse = await apiFetch('/api/staff-registrations');
+        if (!staffResponse || !staffResponse.success) {
+            staffTbody.innerHTML = '<tr><td colspan="4">Error loading staff registrations.</td></tr>';
+            return;
+        }
+
+        const staffRegistrations = staffResponse.data;
+        staffTbody.innerHTML = '';
+        if (staffRegistrations.length === 0) {
+            staffTbody.innerHTML = '<tr><td colspan="4">No pending staff registrations.</td></tr>';
+        } else {
+            staffRegistrations.forEach(reg => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${reg.name}</td>
+                    <td>${reg.username}</td>
+                    <td><span class="role-badge">${reg.role}</span></td>
+                    <td>
+                        <button class="btn btn-green" data-action="approve" data-id="${reg.id}">Approve</button>
+                        <button class="btn btn-red" data-action="reject" data-id="${reg.id}">Reject</button>
+                    </td>
+                `;
+                staffTbody.appendChild(tr);
+            });
+        }
     };
 
     // --- Excuses Logic ---
@@ -851,6 +1467,76 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         renderPendingExcuses();
+    };
+
+    // --- Announcements Logic ---
+    const initAnnouncements = () => {
+        const form = document.getElementById('announcementForm');
+        const listContainer = document.getElementById('announcementsList');
+
+        const renderAnnouncements = async () => {
+            listContainer.innerHTML = '<div class="loader">Loading...</div>';
+            const response = await apiFetch('/api/announcements');
+            if (!response || !response.success) {
+                listContainer.innerHTML = '<p>Error loading announcements.</p>';
+                return;
+            }
+            const announcements = response.data;
+            listContainer.innerHTML = '';
+            if (announcements.length === 0) {
+                listContainer.innerHTML = '<p>No announcements found.</p>';
+                return;
+            }
+            announcements.forEach(a => {
+                const item = document.createElement('div');
+                item.className = 'card';
+                item.style.marginBottom = '15px';
+                item.style.border = '1px solid #e2e8f0';
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div>
+                            <h4 style="margin:0 0 5px 0;">${a.title}</h4>
+                            <small class="text-secondary">Posted by ${a.author_name} on ${new Date(a.created_at).toLocaleString()}</small>
+                        </div>
+                        <button class="btn btn-red" onclick="deleteAnnouncement(${a.id})">Delete</button>
+                    </div>
+                    <p style="margin-top:10px; white-space: pre-wrap;">${a.content}</p>
+                `;
+                listContainer.appendChild(item);
+            });
+        };
+
+        window.deleteAnnouncement = async (id) => {
+            if (!confirm('Delete this announcement?')) return;
+            const res = await apiFetch(`/api/announcements/${id}`, { method: 'DELETE' });
+            if (res && res.success) {
+                showMessage('Announcement deleted.');
+                renderAnnouncements();
+            }
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('announcementTitle').value;
+            const content = document.getElementById('announcementContent').value;
+            const btn = form.querySelector('button');
+            btn.disabled = true;
+
+            const res = await apiFetch('/api/announcements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content })
+            });
+
+            if (res && res.success) {
+                showMessage('Announcement posted.');
+                form.reset();
+                renderAnnouncements();
+            }
+            btn.disabled = false;
+        });
+
+        renderAnnouncements();
     };
 
     // --- Staff Management Logic (Admin only) ---

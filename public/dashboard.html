@@ -22,8 +22,12 @@
                 <a href="#" class="nav-link" data-section="students">Students</a>
                 <a href="#" class="nav-link" data-section="attendance">Attendance</a>
                 <a href="#" class="nav-link" data-section="excuses">Excuses</a>
+                <a href="#" class="nav-link" data-section="announcements">Announcements</a>
                 <a href="#" class="nav-link" data-section="history">Student History</a>
+                <a href="#" class="nav-link" data-section="registrations">Registrations</a>
                 <a href="#" class="nav-link" data-section="password">Change Password</a>
+                <a href="#" class="nav-link" data-section="courses">Courses</a>
+                <a href="#" class="nav-link" data-section="rooms">Rooms</a>
                 <a href="#" class="nav-link" data-section="staff">Staff</a>
                 <a href="#" class="nav-link" data-section="audit">Audit Log</a>
             </nav>
@@ -68,20 +72,26 @@
                     <input type="text" id="stuName" required>
                 </div>
                 <div class="form-group" id="studentCodeGroup">
-                    <label>Student ID</label>
+                    <label>Student Code</label>
                     <input type="text" id="stuCode" required>
                 </div>
                 <div class="form-group" id="manualStudentCodeGroup">
-                    <label>Student ID (Optional)</label>
-                    <input type="text" id="manualStudentCode" placeholder="e.g., 2023-159">
+                    <label>Student Code (Optional)</label>
+                    <input type="text" id="manualStudentCode" placeholder="e.g., 0001">
                 </div>
                 <div class="form-row">
                     <div class="form-group flex-1"><label>Age</label><input type="number" id="stuAge" required></div>
                     <div class="form-group flex-1"><label>Gender</label><select id="stuGender" required><option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-                </div>
-                <div class="form-group">
-                    <label>Room</label>
-                    <input type="text" id="stuRoom" required>
+                    <div class="form-group flex-1">
+                        <label>Year Level</label>
+                        <select id="stuYearLevel">
+                            <option value="">Select</option>
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="4th Year">4th Year</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-row" style="justify-content: flex-end; gap: 10px;">
                     <button type="button" id="cancelStudentFormBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
@@ -103,6 +113,115 @@
                 <button type="button" id="copyResetLinkBtn" class="btn btn-green">Copy Link</button>
                 <button type="button" id="closeResetLinkModalBtn" class="btn" style="background-color: var(--text-secondary);">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Course Modal -->
+    <div id="courseFormModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="courseFormTitle">Add New Course</h3>
+            <form id="courseForm">
+                <input type="hidden" id="editCourseId">
+                <div class="form-group">
+                    <label>Course Code</label>
+                    <input type="text" id="courseCode" required placeholder="e.g., CS101">
+                </div>
+                <div class="form-group">
+                    <label>Course Name</label>
+                    <input type="text" id="courseName" required placeholder="e.g., Intro to Computer Science">
+                </div>
+                <div class="form-group">
+                    <label>Assigned Room</label>
+                    <select id="courseRoom">
+                        <option value="">None</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Start Time</label>
+                        <input type="time" id="courseStartTime">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>End Time</label>
+                        <input type="time" id="courseEndTime">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Days</label>
+                    <div class="days-checkboxes" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <label><input type="checkbox" name="courseDays" value="Mon"> Mon</label>
+                        <label><input type="checkbox" name="courseDays" value="Tue"> Tue</label>
+                        <label><input type="checkbox" name="courseDays" value="Wed"> Wed</label>
+                        <label><input type="checkbox" name="courseDays" value="Thu"> Thu</label>
+                        <label><input type="checkbox" name="courseDays" value="Fri"> Fri</label>
+                        <label><input type="checkbox" name="courseDays" value="Sat"> Sat</label>
+                    </div>
+                </div>
+                <div class="form-row" style="justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="cancelCourseFormBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
+                    <button type="submit" class="btn btn-green">Save Course</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Room Modal -->
+    <div id="roomFormModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="roomFormTitle">Add New Room</h3>
+            <form id="roomForm">
+                <input type="hidden" id="editRoomId">
+                <div class="form-group">
+                    <label>Room Name</label>
+                    <input type="text" id="roomName" required placeholder="e.g., Computer Lab">
+                </div>
+                <div class="form-group">
+                    <label>Room Number</label>
+                    <input type="text" id="roomNumber" required placeholder="e.g., 101">
+                </div>
+                <div class="form-row" style="justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="cancelRoomFormBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
+                    <button type="submit" class="btn btn-green">Save Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Enrollment Modal -->
+    <div id="enrollmentModal" class="modal" style="display:none;">
+        <div class="modal-content modal-lg">
+            <h3 id="enrollmentTitle">Manage Enrollment</h3>
+            <div class="form-row">
+                <input type="text" id="enrollmentSearch" placeholder="Search students to enroll..." style="flex: 1;">
+            </div>
+            <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                <table id="enrollmentTable">
+                    <thead><tr><th>Code</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="form-row" style="justify-content: flex-end; margin-top: 15px;">
+                <button type="button" id="closeEnrollmentBtn" class="btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Select Course Modal (for Attendance) -->
+    <div id="courseSelectionModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3 id="courseSelectionTitle">Select Course</h3>
+            <form id="courseSelectionForm">
+                <div class="form-group">
+                    <label>Available Courses</label>
+                    <select id="selectedCourseId" required>
+                        <option value="">Select a course...</option>
+                    </select>
+                </div>
+                <div class="form-row" style="justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="cancelCourseSelectionBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
+                    <button type="submit" class="btn btn-green" id="confirmCourseSelectionBtn">Confirm</button>
+                </div>
+            </form>
         </div>
     </div>
 

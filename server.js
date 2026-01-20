@@ -53,33 +53,24 @@ const generateStudentCode = async (db) => {
     const year = new Date().getFullYear();
     const key = `last_student_seq_${year}`;
 
-    try {
-        // Start a transaction to reduce race conditions
-        await db.run('BEGIN IMMEDIATE');
+    // Get current sequence for this year (0 if none)
+    const row = await db.get('SELECT value FROM app_meta WHERE key = ?', key);
+    let seq = row ? row.value : 0;
+    let candidate;
 
-        // Get current sequence for this year (0 if none)
-        const row = await db.get('SELECT value FROM app_meta WHERE key = ?', key);
-        let seq = row ? row.value : 0;
-        let candidate;
-
-        // Find next unused sequence
-        while (true) {
-            seq += 1;
-            const seqStr = String(seq).padStart(3, '0');
-            candidate = `${year}-${seqStr}`;
-            const exists = await db.get('SELECT 1 FROM student_details WHERE student_code = ?', candidate);
-            if (!exists) break; // found a free code
-        }
-
-        // Update the sequence value in app_meta
-        await db.run('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [key, seq]);
-
-        await db.run('COMMIT');
-        return candidate;
-    } catch (err) {
-        try { await db.run('ROLLBACK'); } catch (e) { /* ignore rollback errors */ }
-        throw err;
+    // Find next unused sequence
+    while (true) {
+        seq += 1;
+        const seqStr = String(seq).padStart(3, '0');
+        candidate = `${year}-${seqStr}`;
+        const exists = await db.get('SELECT 1 FROM student_details WHERE student_code = ?', candidate);
+        if (!exists) break; // found a free code
     }
+
+    // Update the sequence value in app_meta
+    await db.run('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [key, seq]);
+
+    return candidate;
 };
 
 // --- Audit Log Helper ---
@@ -113,7 +104,7 @@ app.post('/api/login', asyncHandler(async (req, res) => {
     const { username, password } = req.body;
     const db = await dbPromise;
     const user = await db.get(`
-        SELECT u.*, sd.student_code, sd.room
+        SELECT u.*, sd.student_code
         FROM users u
         LEFT JOIN student_details sd ON u.id = sd.user_id
         WHERE u.username = ?
@@ -132,8 +123,7 @@ app.post('/api/login', asyncHandler(async (req, res) => {
             username: user.username,
             name: user.name,
             role: user.role,
-            student_code: user.student_code,
-            room: user.room
+            student_code: user.student_code
         };
         res.json({ success: true });
         await logAction(user.id, user.username, 'LOGIN_SUCCESS');
@@ -224,7 +214,7 @@ app.post('/api/reset-password', asyncHandler(async (req, res) => {
 app.post('/api/student-setup/validate', asyncHandler(async (req, res) => {
     const { student_code } = req.body;
     if (!student_code) {
-        return res.status(400).json({ error: 'Student ID is required.' });
+        return res.status(400).json({ error: 'Student Code is required.' });
     }
 
     const db = await dbPromise;
@@ -236,7 +226,7 @@ app.post('/api/student-setup/validate', asyncHandler(async (req, res) => {
     `, student_code);
 
     if (!student) {
-        return res.status(404).json({ error: 'Student ID not found.' });
+        return res.status(404).json({ error: 'Student Code not found.' });
     }
 
     if (student.username) { // If username is not NULL, account is already set up
@@ -249,7 +239,7 @@ app.post('/api/student-setup/validate', asyncHandler(async (req, res) => {
 app.post('/api/student-setup/complete', asyncHandler(async (req, res) => {
     const { student_code, username, password } = req.body;
     if (!student_code || !username || !password) {
-        return res.status(400).json({ error: 'Student ID, username, and password are required.' });
+        return res.status(400).json({ error: 'Student Code, username, and password are required.' });
     }
 
     const db = await dbPromise;
@@ -314,28 +304,43 @@ app.get('/api/students', isAuthenticated, asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10; // Default to 10 students per page
     const search = req.query.search || '';
+    const courseId = req.query.course_id || '';
+    const yearLevel = req.query.year_level || '';
     const offset = (page - 1) * limit;
 
     try {
         const db = await dbPromise;
         const searchTerm = `%${search}%`;
 
+        let whereClause = "u.role = 'student' AND u.name LIKE ?";
+        let params = [searchTerm];
+
+        if (yearLevel) {
+            whereClause += " AND sd.year_level = ?";
+            params.push(yearLevel);
+        }
+
+        if (courseId) {
+            whereClause += " AND EXISTS (SELECT 1 FROM student_courses sc WHERE sc.user_id = u.id AND sc.course_id = ?)";
+            params.push(courseId);
+        }
+
         // Get total count for pagination, considering the search term
         const totalResult = await db.get(
-            "SELECT COUNT(*) as count FROM users WHERE role = 'student' AND name LIKE ?",
-            [searchTerm]
+            `SELECT COUNT(*) as count FROM users u JOIN student_details sd ON u.id = sd.user_id WHERE ${whereClause}`,
+            params
         );
         const totalStudents = totalResult.count;
         const totalPages = Math.ceil(totalStudents / limit);
 
         // Get students for the current page
         const students = await db.all(
-            `SELECT u.username, u.name, sd.student_code, sd.age, sd.gender, sd.room
+            `SELECT u.username, u.name, sd.student_code, sd.age, sd.gender, sd.year_level
              FROM users u
              JOIN student_details sd ON u.id = sd.user_id
-             WHERE u.role = 'student' AND u.name LIKE ?
+             WHERE ${whereClause}
              ORDER BY sd.student_code LIMIT ? OFFSET ?`,
-            [searchTerm, limit, offset]
+            [...params, limit, offset]
         );
 
         res.json({
@@ -353,13 +358,13 @@ app.get('/api/students', isAuthenticated, asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/students', requireRole(['admin', 'registrar']), asyncHandler(async (req, res) => {
-    const { name, age, gender, room, student_code: manualCode } = req.body;
-    if (!name || !age || !gender || !room) {
-        return res.status(400).json({ error: 'Name, age, gender, and room are required.' });
+    const { name, age, gender, year_level, student_code: manualCode } = req.body;
+    if (!name || !age || !gender) {
+        return res.status(400).json({ error: 'Name, age, and gender are required.' });
     }
 
     const db = await dbPromise;
-    await db.run('BEGIN');
+    await db.run('BEGIN IMMEDIATE');
     try {
         let studentCode = manualCode ? manualCode.trim() : null;
 
@@ -368,7 +373,7 @@ app.post('/api/students', requireRole(['admin', 'registrar']), asyncHandler(asyn
             const existing = await db.get('SELECT user_id FROM student_details WHERE student_code = ?', studentCode);
             if (existing) {
                 await db.run('ROLLBACK');
-                return res.status(409).json({ error: 'This Student ID is already in use.' });
+                return res.status(409).json({ error: 'This Student Code is already in use.' });
             }
         } else {
                 // Generate a new code with year-prefix and per-year sequence
@@ -384,13 +389,13 @@ app.post('/api/students', requireRole(['admin', 'registrar']), asyncHandler(asyn
 
         // 2. Insert into student_details table
         await db.run(
-            "INSERT INTO student_details (user_id, student_code, age, gender, room) VALUES (?, ?, ?, ?, ?)",
-            [userId, studentCode, age, gender, room]
+            "INSERT INTO student_details (user_id, student_code, age, gender, year_level) VALUES (?, ?, ?, ?, ?)",
+            [userId, studentCode, age, gender, year_level || null]
         );
 
         await db.run('COMMIT');
         await logAction(req.session.user.id, req.session.user.username, 'CREATE_STUDENT', { student_code: studentCode, name });
-        res.status(201).json({ id: userId, student_code: studentCode, ...req.body });
+        res.status(201).json({ ...req.body, id: userId, student_code: studentCode });
     } catch (err) {
         await db.run('ROLLBACK');
         throw err;
@@ -418,9 +423,9 @@ app.delete('/api/students/:code', requireRole(['admin', 'registrar']), asyncHand
 
 app.put('/api/students/:code', requireRole(['admin', 'registrar']), asyncHandler(async (req, res) => {
     const { code } = req.params;
-    const { name, age, gender, room, student_code: newStudentCode } = req.body;
+    const { name, age, gender, year_level, student_code: newStudentCode } = req.body;
 
-    if (!name || !age || !gender || !room) {
+    if (!name || !age || !gender) {
         return res.status(400).json({ error: 'All fields are required.' });
     }
 
@@ -442,11 +447,11 @@ app.put('/api/students/:code', requireRole(['admin', 'registrar']), asyncHandler
             const existing = await db.get('SELECT user_id FROM student_details WHERE student_code = ?', newStudentCode);
             if (existing) {
                 await db.run('ROLLBACK');
-                return res.status(409).json({ error: 'The new Student ID is already in use.' });
+                return res.status(409).json({ error: 'The new Student Code is already in use.' });
             }
-            await db.run('UPDATE student_details SET student_code = ?, age = ?, gender = ?, room = ? WHERE user_id = ?', [newStudentCode, age, gender, room, student.user_id]);
+            await db.run('UPDATE student_details SET student_code = ?, age = ?, gender = ?, year_level = ? WHERE user_id = ?', [newStudentCode, age, gender, year_level || null, student.user_id]);
         } else {
-            await db.run('UPDATE student_details SET age = ?, gender = ?, room = ? WHERE user_id = ?', [age, gender, room, student.user_id]);
+            await db.run('UPDATE student_details SET age = ?, gender = ?, year_level = ? WHERE user_id = ?', [age, gender, year_level || null, student.user_id]);
         }
 
         await db.run('COMMIT');
@@ -478,22 +483,22 @@ app.post('/api/students/upload-csv', requireRole(['admin', 'registrar']), upload
             let successfulUploads = 0;
 
             for (const student of results) {
-                const { name, age, gender, room, student_code: manualCode } = student;
+                const { name, age, gender, student_code: manualCode } = student;
 
                 // Basic validation for required fields in the CSV row
-                if (!name || !age || !gender || !room) {
-                    errors.push({ student: name || 'Unknown Row', error: 'Missing required fields (name, age, gender, room).' });
+                if (!name || !age || !gender) {
+                    errors.push({ student: name || 'Unknown Row', error: 'Missing required fields (name, age, gender).' });
                     continue;
                 }
 
-                await db.run('BEGIN');
+                await db.run('BEGIN IMMEDIATE');
                 try {
                     let studentCode = manualCode ? manualCode.trim() : null;
 
                     if (studentCode) {
                         const existing = await db.get('SELECT user_id FROM student_details WHERE student_code = ?', studentCode);
                         if (existing) {
-                            throw new Error(`Student ID ${studentCode} is already in use.`);
+                            throw new Error(`Student Code ${studentCode} is already in use.`);
                         }
                     } else {
                         // Generate a per-year student code like YYYY-XXX
@@ -503,7 +508,7 @@ app.post('/api/students/upload-csv', requireRole(['admin', 'registrar']), upload
                     const userResult = await db.run("INSERT INTO users (role, name) VALUES ('student', ?)", [name]);
                     const userId = userResult.lastID;
 
-                    await db.run("INSERT INTO student_details (user_id, student_code, age, gender, room) VALUES (?, ?, ?, ?, ?)", [userId, studentCode, age, gender, room]);
+                    await db.run("INSERT INTO student_details (user_id, student_code, age, gender) VALUES (?, ?, ?, ?)", [userId, studentCode, age, gender]);
                     await db.run('COMMIT');
                     successfulUploads++;
                     await logAction(req.session.user.id, req.session.user.username, 'BULK_CREATE_STUDENT', { student_code: studentCode, name });
@@ -592,6 +597,239 @@ app.post('/api/staff/:id/reset-password', requireRole(['admin']), asyncHandler(a
     res.json({ message: `Password reset link for ${user.username} has been generated.`, resetLink });
 }));
 
+// --- Room Management ---
+
+app.get('/api/rooms', isAuthenticated, asyncHandler(async (req, res) => {
+    const db = await dbPromise;
+    const rooms = await db.all('SELECT * FROM rooms ORDER BY name');
+    res.json(rooms);
+}));
+
+app.post('/api/rooms', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { name, room_number } = req.body;
+    if (!name || !room_number) return res.status(400).json({ error: 'Room name and number are required.' });
+
+    const db = await dbPromise;
+
+    const existing = await db.get('SELECT id FROM rooms WHERE name = ? AND room_number = ?', [name, room_number]);
+    if (existing) {
+        return res.status(409).json({ error: 'A room with this name and number already exists.' });
+    }
+
+    try {
+        const result = await db.run('INSERT INTO rooms (name, room_number) VALUES (?, ?)', [name, room_number]);
+        await logAction(req.session.user.id, req.session.user.username, 'CREATE_ROOM', { name, room_number });
+        res.status(201).json({ success: true, id: result.lastID, name, room_number });
+    } catch (err) {
+        throw err;
+    }
+}));
+
+app.put('/api/rooms/:id', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { name, room_number } = req.body;
+    if (!name || !room_number) return res.status(400).json({ error: 'Room name and number are required.' });
+
+    const db = await dbPromise;
+
+    const existing = await db.get('SELECT id FROM rooms WHERE name = ? AND room_number = ? AND id != ?', [name, room_number, id]);
+    if (existing) {
+        return res.status(409).json({ error: 'A room with this name and number already exists.' });
+    }
+
+    try {
+        const result = await db.run('UPDATE rooms SET name = ?, room_number = ? WHERE id = ?', [name, room_number, id]);
+        if (result.changes > 0) {
+            await logAction(req.session.user.id, req.session.user.username, 'UPDATE_ROOM', { id, name, room_number });
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: 'Room not found.' });
+        }
+    } catch (err) {
+        throw err;
+    }
+}));
+
+app.delete('/api/rooms/:id', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+    const result = await db.run('DELETE FROM rooms WHERE id = ?', id);
+    if (result.changes > 0) {
+        await logAction(req.session.user.id, req.session.user.username, 'DELETE_ROOM', { id });
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Room not found.' });
+    }
+}));
+
+// --- Course Management ---
+
+app.get('/api/courses', isAuthenticated, asyncHandler(async (req, res) => {
+    const db = await dbPromise;
+    const courses = await db.all(`
+        SELECT c.*, r.name as room_name, r.room_number 
+        FROM courses c 
+        LEFT JOIN rooms r ON c.room_id = r.id 
+        ORDER BY c.code
+    `);
+    res.json(courses);
+}));
+
+// Helper to check for schedule conflicts
+const checkScheduleConflict = async (db, roomId, startTime, endTime, days, excludeCourseId = null) => {
+    if (!roomId || !startTime || !endTime || !days) return false;
+
+    let query = 'SELECT id, name, start_time, end_time, days FROM courses WHERE room_id = ?';
+    const params = [roomId];
+
+    if (excludeCourseId) {
+        query += ' AND id != ?';
+        params.push(excludeCourseId);
+    }
+
+    const existingCourses = await db.all(query, params);
+    const newDays = days.split(',');
+
+    for (const course of existingCourses) {
+        if (!course.start_time || !course.end_time || !course.days) continue;
+
+        const existingDays = course.days.split(',');
+        const daysOverlap = newDays.some(day => existingDays.includes(day));
+
+        if (daysOverlap) {
+            // Check time overlap: (StartA < EndB) and (EndA > StartB)
+            if (startTime < course.end_time && endTime > course.start_time) {
+                return true; // Conflict found
+            }
+        }
+    }
+    return false;
+};
+
+app.post('/api/courses', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { code, name, room_id, start_time, end_time, days } = req.body;
+    if (!code || !name) return res.status(400).json({ error: 'Course code and name are required.' });
+
+    const db = await dbPromise;
+
+    const existing = await db.get('SELECT id FROM courses WHERE code = ?', [code]);
+    if (existing) {
+        return res.status(409).json({ error: 'A course with this code already exists.' });
+    }
+
+    if (room_id && start_time && end_time && days) {
+        const hasConflict = await checkScheduleConflict(db, room_id, start_time, end_time, days);
+        if (hasConflict) {
+            return res.status(409).json({ error: 'Schedule conflict: The selected room is already booked for this time.' });
+        }
+    }
+
+    try {
+        const result = await db.run(
+            'INSERT INTO courses (code, name, room_id, start_time, end_time, days) VALUES (?, ?, ?, ?, ?, ?)',
+            [code, name, room_id || null, start_time || null, end_time || null, days || null]
+        );
+        await logAction(req.session.user.id, req.session.user.username, 'CREATE_COURSE', { code, name, room_id, start_time, end_time, days });
+        res.status(201).json({ success: true, id: result.lastID, code, name, room_id });
+    } catch (err) {
+        throw err;
+    }
+}));
+
+app.put('/api/courses/:id', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { code, name, room_id, start_time, end_time, days } = req.body;
+    if (!code || !name) return res.status(400).json({ error: 'Course code and name are required.' });
+
+    const db = await dbPromise;
+
+    const existing = await db.get('SELECT id FROM courses WHERE code = ? AND id != ?', [code, id]);
+    if (existing) {
+        return res.status(409).json({ error: 'A course with this code already exists.' });
+    }
+
+    if (room_id && start_time && end_time && days) {
+        const hasConflict = await checkScheduleConflict(db, room_id, start_time, end_time, days, id);
+        if (hasConflict) {
+            return res.status(409).json({ error: 'Schedule conflict: The selected room is already booked for this time.' });
+        }
+    }
+
+    try {
+        const result = await db.run(
+            'UPDATE courses SET code = ?, name = ?, room_id = ?, start_time = ?, end_time = ?, days = ? WHERE id = ?',
+            [code, name, room_id || null, start_time || null, end_time || null, days || null, id]
+        );
+        if (result.changes > 0) {
+            await logAction(req.session.user.id, req.session.user.username, 'UPDATE_COURSE', { id, code, name, room_id, start_time, end_time, days });
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: 'Course not found.' });
+        }
+    } catch (err) {
+        throw err;
+    }
+}));
+
+app.delete('/api/courses/:id', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+    const result = await db.run('DELETE FROM courses WHERE id = ?', id);
+    if (result.changes > 0) {
+        await db.run('DELETE FROM student_courses WHERE course_id = ?', id); // Cleanup enrollments
+        await logAction(req.session.user.id, req.session.user.username, 'DELETE_COURSE', { id });
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Course not found.' });
+    }
+}));
+
+app.get('/api/public/courses', asyncHandler(async (req, res) => {
+    const db = await dbPromise;
+    // Public endpoint for signup form, only select necessary fields
+    const courses = await db.all('SELECT id, code, name FROM courses ORDER BY code');
+    res.json(courses);
+}));
+
+// --- Enrollment Management ---
+
+app.get('/api/courses/:id/students', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const search = req.query.search || '';
+    const db = await dbPromise;
+
+    // Return all students with a flag indicating if they are enrolled in the course
+    const students = await db.all(`
+        SELECT u.id as user_id, u.name, sd.student_code,
+               CASE WHEN sc.course_id IS NOT NULL THEN 1 ELSE 0 END as is_enrolled
+        FROM users u
+        JOIN student_details sd ON u.id = sd.user_id
+        LEFT JOIN student_courses sc ON u.id = sc.user_id AND sc.course_id = ?
+        WHERE u.role = 'student' AND (u.name LIKE ? OR sd.student_code LIKE ?)
+        ORDER BY is_enrolled DESC, u.name
+    `, [id, `%${search}%`, `%${search}%`]);
+
+    res.json(students);
+}));
+
+app.post('/api/courses/:id/enroll', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { student_id } = req.body;
+    const db = await dbPromise;
+    await db.run('INSERT OR IGNORE INTO student_courses (user_id, course_id) VALUES (?, ?)', [student_id, id]);
+    await logAction(req.session.user.id, req.session.user.username, 'ENROLL_STUDENT', { course_id: id, student_id });
+    res.json({ success: true });
+}));
+
+app.post('/api/courses/:id/unenroll', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { student_id } = req.body;
+    const db = await dbPromise;
+    await db.run('DELETE FROM student_courses WHERE user_id = ? AND course_id = ?', [student_id, id]);
+    await logAction(req.session.user.id, req.session.user.username, 'UNENROLL_STUDENT', { course_id: id, student_id });
+    res.json({ success: true });
+}));
+
 // --- Student History ---
 app.get('/api/students-list', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
     const db = await dbPromise;
@@ -629,7 +867,7 @@ app.get('/api/student-profile/:student_code', requireRole(['admin', 'teacher']),
 
     // 1. Get student details
     const student = await db.get(`
-        SELECT u.id, u.name, sd.student_code, sd.age, sd.gender, sd.room
+        SELECT u.id, u.name, sd.student_code, sd.age, sd.gender
         FROM users u
         JOIN student_details sd ON u.id = sd.user_id
         WHERE sd.student_code = ?
@@ -719,28 +957,28 @@ app.get('/api/dashboard-summary', isAuthenticated, asyncHandler(async (req, res)
 
 app.get('/api/attendance/:date', asyncHandler(async (req, res) => {
     const { date } = req.params;
+    const { course_id } = req.query;
+
+    if (!course_id) {
+        return res.status(400).json({ error: 'Course ID is required.' });
+    }
+
     const db = await dbPromise;
     try {
-        // This logic ensures that all students have an attendance record for the given date.
-        // It's more robust than a cron job as it runs on-demand.
-
-        // 1. Get all student IDs
-        const allStudents = await db.all("SELECT id FROM users WHERE role = 'student'");
-        if (allStudents.length > 0) {
-            // 2. Get IDs of students who already have an attendance record for this date
-            const studentsWithRecords = await db.all('SELECT user_id FROM attendance WHERE date = ?', date);
+        // 1. Get all students enrolled in this course
+        const enrolledStudents = await db.all("SELECT user_id FROM student_courses WHERE course_id = ?", course_id);
+        
+        if (enrolledStudents.length > 0) {
+            // 2. Ensure attendance records exist for these students for this date and course
+            const studentsWithRecords = await db.all('SELECT user_id FROM attendance WHERE date = ? AND course_id = ?', [date, course_id]);
             const studentsWithRecordsIds = new Set(studentsWithRecords.map(r => r.user_id));
+            const missingStudents = enrolledStudents.filter(s => !studentsWithRecordsIds.has(s.user_id));
 
-            // 3. Find students who are missing a record
-            const missingStudents = allStudents.filter(s => !studentsWithRecordsIds.has(s.id));
-
-            // 4. Insert 'Absent' records for them if any are missing
             if (missingStudents.length > 0) {
                 await db.run('BEGIN');
-                // Use INSERT OR IGNORE to be safe in case of race conditions
-                const stmt = await db.prepare('INSERT OR IGNORE INTO attendance (user_id, date, time, status) VALUES (?, ?, ?, ?)');
+                const stmt = await db.prepare('INSERT OR IGNORE INTO attendance (user_id, course_id, date, time, status) VALUES (?, ?, ?, ?, ?)');
                 for (const student of missingStudents) {
-                    await stmt.run(student.id, date, '--', 'Absent');
+                    await stmt.run(student.user_id, course_id, date, '--', 'Absent');
                 }
                 await stmt.finalize();
                 await db.run('COMMIT');
@@ -753,9 +991,9 @@ app.get('/api/attendance/:date', asyncHandler(async (req, res) => {
             FROM attendance a
             JOIN users u ON u.id = a.user_id
             JOIN student_details sd ON u.id = sd.user_id
-            WHERE a.date = ?
+            WHERE a.date = ? AND a.course_id = ?
             ORDER BY sd.student_code
-        `, date);
+        `, [date, course_id]);
 
         res.json(attendanceList);
     } catch (err) {
@@ -766,9 +1004,9 @@ app.get('/api/attendance/:date', asyncHandler(async (req, res) => {
 }));
 
 app.put('/api/attendance', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
-    const { date, student_code, status } = req.body;
-    if (!date || !student_code || !status) {
-        return res.status(400).json({ error: 'Date, student code, and status are required.' });
+    let { date, student_code, status, course_id } = req.body;
+    if (!date || !student_code || !status || !course_id) {
+        return res.status(400).json({ error: 'Date, student code, course ID, and status are required.' });
     }
     try {
         const db = await dbPromise;
@@ -777,6 +1015,30 @@ app.put('/api/attendance', requireRole(['admin', 'teacher']), asyncHandler(async
             ? `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
             : '--';
         
+        // Logic: If marked Present > 15 mins after start time, record as Late.
+        if (status === 'Present') {
+            const course = await db.get('SELECT start_time FROM courses WHERE id = ?', course_id);
+            if (course && course.start_time) {
+                const [startH, startM] = course.start_time.split(':').map(Number);
+                const startTimeDate = new Date();
+                startTimeDate.setHours(startH, startM, 0, 0);
+
+                // Add 15 minutes to start time
+                const lateThreshold = new Date(startTimeDate.getTime() + 15 * 60000);
+                
+                // Compare only times (ignoring date part of 'now' vs 'startTimeDate' if they differ in day, 
+                // but here we assume attendance is taken on the day. 
+                // Actually, 'now' is the current server time. 
+                // If the teacher is updating attendance for a PAST date, we shouldn't auto-mark Late based on current time.
+                // So we only apply this logic if the attendance date matches today.
+                const todayStr = now.toISOString().split('T')[0];
+                
+                if (date === todayStr && now > lateThreshold) {
+                    status = 'Late';
+                }
+            }
+        }
+
         const user = await db.get(`
             SELECT u.id FROM users u
             JOIN student_details sd ON u.id = sd.user_id
@@ -785,10 +1047,10 @@ app.put('/api/attendance', requireRole(['admin', 'teacher']), asyncHandler(async
         if (!user) {
             return res.status(404).json({ error: 'Student not found.' });
         }
-        const result = await db.run('UPDATE attendance SET status = ?, time = ? WHERE date = ? AND user_id = ?', [status, time, date, user.id]);
+        const result = await db.run('UPDATE attendance SET status = ?, time = ? WHERE date = ? AND user_id = ? AND course_id = ?', [status, time, date, user.id, course_id]);
 
         if (result.changes > 0) {
-            await logAction(req.session.user.id, req.session.user.username, 'UPDATE_ATTENDANCE', { student_code, date, status });
+            await logAction(req.session.user.id, req.session.user.username, 'UPDATE_ATTENDANCE', { student_code, date, status, course_id });
             res.json({ message: 'Attendance updated.' });
         } else {
             res.status(404).json({ error: 'Attendance record not found.' });
@@ -801,27 +1063,33 @@ app.put('/api/attendance', requireRole(['admin', 'teacher']), asyncHandler(async
 // Export attendance to CSV
 app.get('/api/attendance/:date/csv', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
     const { date } = req.params;
+    const { course_id } = req.query;
+    if (!course_id) {
+        return res.status(400).send('Course ID is required');
+    }
     try {
         const db = await dbPromise;
         const records = await db.all(`
-            SELECT sd.student_code, u.name, a.time, a.status
+            SELECT sd.student_code, u.name, a.time, a.status, r.name as room_name, r.room_number
             FROM attendance a
             JOIN users u ON u.id = a.user_id
             JOIN student_details sd ON u.id = sd.user_id
-            WHERE a.date = ? ORDER BY sd.student_code
-        `, date);
+            JOIN courses c ON a.course_id = c.id
+            LEFT JOIN rooms r ON c.room_id = r.id
+            WHERE a.date = ? AND a.course_id = ? ORDER BY sd.student_code
+        `, [date, course_id]);
 
         if (records.length === 0) {
             // Send a CSV with only headers if no records are found
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename="attendance-${date}.csv"`);
-            return res.status(200).send('"Code","Name","Time","Status"\n');
+            return res.status(200).send('"Code","Name","Time","Status","Room Name","Room Number"\n');
         }
 
         // CSV header
-        const csvHeader = '"Code","Name","Time","Status"\n';
+        const csvHeader = '"Code","Name","Time","Status","Room Name","Room Number"\n';
         // CSV rows
-        const csvRows = records.map(r => `"${r.student_code}","${r.name}","${r.time}","${r.status}"`).join('\n');
+        const csvRows = records.map(r => `"${r.student_code}","${r.name}","${r.time}","${r.status}","${r.room_name || ''}","${r.room_number || ''}"`).join('\n');
 
         const csvData = csvHeader + csvRows;
 
@@ -896,12 +1164,12 @@ app.put('/api/excuses/:id/approve', requireRole(['admin', 'teacher']), asyncHand
 
         await db.run('BEGIN');
         await db.run("UPDATE excuses SET status = 'Approved' WHERE id = ?", id);
+        // Note: Excuses are currently global (daily), not per course.
+        // We might need to update attendance for ALL courses for that student on that day.
         await db.run(`
-            INSERT INTO attendance (user_id, date, time, status)
-            VALUES (?, ?, '--', 'Excused')
-            ON CONFLICT(user_id, date) DO UPDATE SET
-            status = 'Excused', time = '--';
-        `, [user_id, date]);
+            UPDATE attendance SET status = 'Excused', time = '--'
+            WHERE user_id = ? AND date = ?
+        `, [user_id, date]); // This updates all course attendance for that day
         await db.run('COMMIT');
 
         await logAction(req.session.user.id, req.session.user.username, 'APPROVE_EXCUSE', { excuse_id: id, student_user_id: user_id });
@@ -975,7 +1243,7 @@ app.get('/api/summary/:student_code', asyncHandler(async (req, res) => {
         const db = await dbPromise;
 
         const student = await db.get(`
-            SELECT u.id, u.name, sd.student_code, sd.room FROM users u
+            SELECT u.id, u.name, sd.student_code FROM users u
             JOIN student_details sd ON u.id = sd.user_id
             WHERE sd.student_code = ? AND u.role = 'student'
         `, student_code);
@@ -1000,7 +1268,7 @@ app.get('/api/summary/:student_code', asyncHandler(async (req, res) => {
             }
         });
 
-        res.json({ name: student.name, student_code: student.student_code, room: student.room, summary });
+        res.json({ name: student.name, student_code: student.student_code, summary });
     } catch (err) {
         throw err;
     }
@@ -1025,6 +1293,13 @@ app.get('/api/public/student/:code', asyncHandler(async (req, res) => {
 
 // --- Student-Specific Protected API Endpoints ---
 app.use('/api/student', requireRole(['student']));
+
+app.get('/api/student/excuses', asyncHandler(async (req, res) => {
+    const { id: user_id } = req.session.user;
+    const db = await dbPromise;
+    const excuses = await db.all('SELECT * FROM excuses WHERE user_id = ? ORDER BY date DESC', user_id);
+    res.json(excuses);
+}));
 
 app.post('/api/student/excuse', asyncHandler(async (req, res) => {
     const { reason, date } = req.body;
@@ -1102,6 +1377,213 @@ app.get('/api/audit-logs', requireRole(['admin']), asyncHandler(async (req, res)
     });
 }));
 
+// --- Student Registration (Signup & Approval) ---
+
+app.post('/api/student-signup', asyncHandler(async (req, res) => {
+    const { name, username, password, age, gender, course_id, year_level } = req.body;
+
+    if (!name || !username || !password || !age || !gender || !course_id || !year_level) {
+        return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    const db = await dbPromise;
+
+    // Check if username exists in users or pending registrations
+    const existingUser = await db.get('SELECT id FROM users WHERE username = ?', username);
+    const existingPending = await db.get('SELECT id FROM student_registrations WHERE username = ?', username);
+
+    if (existingUser || existingPending) {
+        return res.status(409).json({ error: 'Username is already taken.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    await db.run(`
+        INSERT INTO student_registrations (name, username, password, age, gender, course_id, year_level)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [name, username, hashedPassword, age, gender, course_id, year_level]);
+
+    res.status(201).json({ success: true, message: 'Registration submitted successfully. Please wait for admin approval.' });
+}));
+
+app.get('/api/student-registrations', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const db = await dbPromise;
+    const registrations = await db.all(`
+        SELECT sr.*, c.code as course_code, c.name as course_name
+        FROM student_registrations sr
+        LEFT JOIN courses c ON sr.course_id = c.id
+        ORDER BY sr.timestamp ASC
+    `);
+    res.json(registrations);
+}));
+
+app.post('/api/student-registrations/:id/approve', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+
+    const registration = await db.get('SELECT * FROM student_registrations WHERE id = ?', id);
+    if (!registration) {
+        return res.status(404).json({ error: 'Registration not found.' });
+    }
+
+    await db.run('BEGIN IMMEDIATE');
+    try {
+        // Double check username uniqueness
+        const existingUser = await db.get('SELECT id FROM users WHERE username = ?', registration.username);
+        if (existingUser) {
+            await db.run('ROLLBACK');
+            return res.status(409).json({ error: `Username ${registration.username} is already taken.` });
+        }
+
+        // 1. Create User
+        const userResult = await db.run("INSERT INTO users (username, password, role, name) VALUES (?, ?, 'student', ?)", [registration.username, registration.password, registration.name]);
+        const userId = userResult.lastID;
+
+        // 2. Generate Student Code
+        const studentCode = await generateStudentCode(db);
+
+        // 3. Create Student Details
+        await db.run("INSERT INTO student_details (user_id, student_code, age, gender, year_level) VALUES (?, ?, ?, ?, ?)", 
+            [userId, studentCode, registration.age, registration.gender, registration.year_level]);
+
+        // 4. Enroll in Course
+        if (registration.course_id) {
+            const course = await db.get('SELECT id FROM courses WHERE id = ?', registration.course_id);
+            if (course) {
+                await db.run('INSERT INTO student_courses (user_id, course_id) VALUES (?, ?)', [userId, registration.course_id]);
+            }
+        }
+
+        // 5. Delete Registration
+        await db.run('DELETE FROM student_registrations WHERE id = ?', id);
+
+        await db.run('COMMIT');
+        await logAction(req.session.user.id, req.session.user.username, 'APPROVE_REGISTRATION', { registration_id: id, new_student_code: studentCode });
+        res.json({ success: true, message: 'Student registration approved.' });
+    } catch (err) {
+        await db.run('ROLLBACK');
+        throw err;
+    }
+}));
+
+app.post('/api/student-registrations/:id/reject', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+    await db.run('DELETE FROM student_registrations WHERE id = ?', id);
+    await logAction(req.session.user.id, req.session.user.username, 'REJECT_REGISTRATION', { registration_id: id });
+    res.json({ success: true, message: 'Registration rejected.' });
+}));
+
+// --- Staff Registration (Signup & Approval) ---
+
+app.post('/api/staff-signup', asyncHandler(async (req, res) => {
+    const { name, username, password } = req.body;
+    // Default role to teacher for public signup
+    const role = 'teacher';
+
+    if (!name || !username || !password) {
+        return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    const db = await dbPromise;
+
+    const existingUser = await db.get('SELECT id FROM users WHERE username = ?', username);
+    const existingPending = await db.get('SELECT id FROM staff_registrations WHERE username = ?', username);
+
+    if (existingUser || existingPending) {
+        return res.status(409).json({ error: 'Username is already taken.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    await db.run(`
+        INSERT INTO staff_registrations (name, username, password, role)
+        VALUES (?, ?, ?, ?)
+    `, [name, username, hashedPassword, role]);
+
+    res.status(201).json({ success: true, message: 'Registration submitted successfully. Please wait for admin approval.' });
+}));
+
+app.get('/api/staff-registrations', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const db = await dbPromise;
+    const registrations = await db.all('SELECT * FROM staff_registrations ORDER BY timestamp ASC');
+    res.json(registrations);
+}));
+
+app.post('/api/staff-registrations/:id/approve', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+
+    const registration = await db.get('SELECT * FROM staff_registrations WHERE id = ?', id);
+    if (!registration) {
+        return res.status(404).json({ error: 'Registration not found.' });
+    }
+
+    await db.run('BEGIN IMMEDIATE');
+    try {
+        const existingUser = await db.get('SELECT id FROM users WHERE username = ?', registration.username);
+        if (existingUser) {
+            await db.run('ROLLBACK');
+            return res.status(409).json({ error: `Username ${registration.username} is already taken.` });
+        }
+
+        await db.run("INSERT INTO users (username, password, role, name) VALUES (?, ?, ?, ?)",
+            [registration.username, registration.password, registration.role, registration.name]);
+
+        await db.run('DELETE FROM staff_registrations WHERE id = ?', id);
+
+        await db.run('COMMIT');
+        await logAction(req.session.user.id, req.session.user.username, 'APPROVE_STAFF_REGISTRATION', { registration_id: id, username: registration.username });
+        res.json({ success: true, message: 'Staff registration approved.' });
+    } catch (err) {
+        await db.run('ROLLBACK');
+        throw err;
+    }
+}));
+
+app.post('/api/staff-registrations/:id/reject', requireRole(['admin']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+    await db.run('DELETE FROM staff_registrations WHERE id = ?', id);
+    await logAction(req.session.user.id, req.session.user.username, 'REJECT_STAFF_REGISTRATION', { registration_id: id });
+    res.json({ success: true, message: 'Registration rejected.' });
+}));
+
+// --- Announcements ---
+
+app.get('/api/announcements', isAuthenticated, asyncHandler(async (req, res) => {
+    const db = await dbPromise;
+    const announcements = await db.all(`
+        SELECT a.*, u.name as author_name 
+        FROM announcements a 
+        LEFT JOIN users u ON a.created_by = u.id 
+        ORDER BY a.created_at DESC
+    `);
+    res.json(announcements);
+}));
+
+app.post('/api/announcements', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
+    const { title, content } = req.body;
+    if (!title || !content) return res.status(400).json({ error: 'Title and content are required.' });
+    
+    const db = await dbPromise;
+    const result = await db.run(
+        'INSERT INTO announcements (title, content, created_by) VALUES (?, ?, ?)',
+        [title, content, req.session.user.id]
+    );
+    
+    await logAction(req.session.user.id, req.session.user.username, 'CREATE_ANNOUNCEMENT', { id: result.lastID, title });
+    res.status(201).json({ success: true, message: 'Announcement posted.' });
+}));
+
+app.delete('/api/announcements/:id', requireRole(['admin', 'teacher']), asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const db = await dbPromise;
+    await db.run('DELETE FROM announcements WHERE id = ?', id);
+    await logAction(req.session.user.id, req.session.user.username, 'DELETE_ANNOUNCEMENT', { id });
+    res.json({ success: true, message: 'Announcement deleted.' });
+}));
+
 // --- Generic Authenticated User Actions ---
 
 app.post('/api/user/change-password', isAuthenticated, asyncHandler(async (req, res) => {
@@ -1174,6 +1656,131 @@ async function startServer() {
         if (typeof dbPromise.ensureSchema === 'function') {
             await dbPromise.ensureSchema();
         }
+
+        // Create rooms table if it doesn't exist
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS rooms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                room_number TEXT NOT NULL
+            )
+        `);
+
+        // Create courses table
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS courses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                room_id INTEGER,
+                start_time TEXT,
+                end_time TEXT,
+                days TEXT,
+                FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE SET NULL
+            )
+        `);
+
+        // Migration: Add room_id column if it doesn't exist
+        try {
+            await db.run("ALTER TABLE courses ADD COLUMN room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL");
+        } catch (err) { /* Column likely exists */ }
+
+        // Migration: Add schedule columns if they don't exist
+        try { await db.run("ALTER TABLE courses ADD COLUMN start_time TEXT"); } catch (err) {}
+        try { await db.run("ALTER TABLE courses ADD COLUMN end_time TEXT"); } catch (err) {}
+        try { await db.run("ALTER TABLE courses ADD COLUMN days TEXT"); } catch (err) {}
+
+        // Create student_courses table
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS student_courses (
+                user_id INTEGER,
+                course_id INTEGER,
+                PRIMARY KEY (user_id, course_id),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE
+            )
+        `);
+
+        // Migrate attendance table to include course_id if it doesn't exist
+        const tableInfo = await db.all("PRAGMA table_info(attendance)");
+        const hasCourseId = tableInfo.some(col => col.name === 'course_id');
+
+        if (!hasCourseId) {
+            console.log('Migrating attendance table to include course_id...');
+            await db.run("ALTER TABLE attendance RENAME TO attendance_old");
+            await db.run(`
+                CREATE TABLE attendance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    course_id INTEGER,
+                    date TEXT,
+                    time TEXT,
+                    status TEXT,
+                    UNIQUE(user_id, course_id, date),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+            `);
+            // Note: Old attendance records without course_id are effectively orphaned/archived in attendance_old
+            // because we can't map them to specific courses automatically.
+        }
+
+        // Create app_meta table for sequence generation if it doesn't exist
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS app_meta (
+                key TEXT PRIMARY KEY,
+                value INTEGER
+            )
+        `);
+
+        // Create student_registrations table
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS student_registrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                age INTEGER,
+                gender TEXT,
+                course_id INTEGER,
+                year_level TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create staff_registrations table
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS staff_registrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create announcements table
+        await db.run(`
+            CREATE TABLE IF NOT EXISTS announcements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_by INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(created_by) REFERENCES users(id)
+            )
+        `);
+
+        // Migration: Remove legacy 'room' column from student_details if it exists
+        try {
+            const tableInfo = await db.all("PRAGMA table_info(student_details)");
+            if (tableInfo.some(col => col.name === 'room')) {
+                await db.run("ALTER TABLE student_details DROP COLUMN room");
+            }
+        } catch (err) { console.error("Migration warning: Could not drop 'room' column from student_details", err.message); }
+
+        // Migration: Add year_level to student_details
+        try { await db.run("ALTER TABLE student_details ADD COLUMN year_level TEXT"); } catch (err) {}
 
         // Check if an admin user exists
         const adminUser = await db.get("SELECT username FROM users WHERE role = 'admin'");
