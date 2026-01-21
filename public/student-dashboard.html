@@ -9,6 +9,9 @@
     <title>Student Dashboard - Attendance System</title>
     <link rel="icon" href="/icons/school-icon.jpeg" />
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <style>
         .announcement-card {
             background: #fff;
@@ -36,6 +39,91 @@
             font-weight: bold;
             color: var(--primary);
         }
+        /* Calendar Customization */
+        .fc {
+            font-family: 'Inter', sans-serif;
+            --fc-border-color: var(--border-color);
+            --fc-button-bg-color: var(--primary);
+            --fc-button-border-color: var(--primary);
+            --fc-button-hover-bg-color: var(--primary-dark);
+            --fc-button-hover-border-color: var(--primary-dark);
+            --fc-button-active-bg-color: var(--primary-dark);
+            --fc-button-active-border-color: var(--primary-dark);
+            --fc-today-bg-color: #f8fafc;
+        }
+        .fc-toolbar-title {
+            font-size: 1.1rem !important;
+            font-weight: 600;
+        }
+        .fc-button {
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            padding: 6px 12px !important;
+            border-radius: 6px !important;
+            text-transform: capitalize !important;
+        }
+        .fc-col-header-cell {
+            background-color: #f1f5f9;
+            padding: 8px 0;
+        }
+        .fc-col-header-cell-cushion {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-decoration: none !important;
+        }
+        .fc-daygrid-day-number {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            text-decoration: none !important;
+            padding: 8px !important;
+        }
+        .fc-daygrid-event {
+            border-radius: 4px !important;
+            padding: 2px 4px !important;
+            font-size: 0.75rem !important;
+            border: none !important;
+            margin-top: 2px !important;
+            cursor: pointer;
+        }
+        
+        /* Legend */
+        .calendar-legend {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .dot.present { background-color: var(--green); }
+        .dot.absent { background-color: var(--red); }
+        .dot.late { background-color: var(--orange); }
+
+        @media (max-width: 600px) {
+            .fc-header-toolbar {
+                flex-direction: column;
+                gap: 10px;
+            }
+            /* Reorder toolbar for mobile: Title on top, then Nav, then Views */
+            .fc-toolbar-chunk:nth-child(2) { order: 1; }
+            .fc-toolbar-chunk:nth-child(1) { order: 2; width: 100%; display: flex; justify-content: space-between; }
+            .fc-toolbar-chunk:nth-child(3) { order: 3; width: 100%; display: flex; justify-content: center; }
+
+            .calendar-legend {
+                display: none; 
+            }
+        }
     </style>
 </head>
 <body>
@@ -47,6 +135,7 @@
             </div>
             <nav class="sidebar-nav">
                 <a href="#" class="nav-link active" data-section="dashboard">Dashboard</a>
+                <a href="#" class="nav-link" data-section="calendar">Calendar</a>
                 <a href="#" class="nav-link" data-section="excuses">Excuses</a>
                 <a href="#" class="nav-link" data-section="settings">Settings</a>
             </nav>
@@ -65,9 +154,22 @@
             <div id="dynamicContentContainer">
                 <!-- Dashboard Section -->
                 <div id="dashboardSection">
+                    <div class="card" style="margin-bottom: 20px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <h3 style="color: white; margin-bottom: 5px;">Mark Attendance</h3>
+                                <p style="color: rgba(255,255,255,0.9); margin: 0;">Enter the session code to record your presence.</p>
+                            </div>
+                            <button id="openMarkAttendanceBtn" class="btn" style="background: white; color: var(--primary-dark); font-weight: bold; border: none; padding: 12px 24px;">Enter Code &rarr;</button>
+                        </div>
+                    </div>
+
                     <div class="card">
-                        <h2 id="welcomeMsg">Welcome!</h2>
-                        <p>Here is your attendance summary.</p>
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <h2 id="welcomeMsg" style="margin: 0;">Welcome!</h2>
+                            <button id="downloadPdfBtn" class="btn btn-green" style="font-size: 13px; padding: 8px 12px;">Download Report (PDF)</button>
+                        </div>
+                        <p style="margin-top: 10px;">Here is your attendance summary.</p>
                         <div class="stats-grid" style="margin-top: 20px;">
                             <div class="stat-box">
                                 <div class="stat-number" id="statPresent">0</div>
@@ -89,6 +191,21 @@
                         <div id="announcementsContainer">
                             <div class="loader">Loading announcements...</div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Calendar Section -->
+                <div id="calendarSection" style="display: none;">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="margin: 0;">Attendance Calendar</h3>
+                            <div class="calendar-legend">
+                                <span class="legend-item"><span class="dot present"></span> Present</span>
+                                <span class="legend-item"><span class="dot absent"></span> Absent</span>
+                                <span class="legend-item"><span class="dot late"></span> Late</span>
+                            </div>
+                        </div>
+                        <div id="attendanceCalendar"></div>
                     </div>
                 </div>
 
@@ -142,6 +259,25 @@
     </div>
     <div id="toastContainer"></div>
 
+    <!-- Mark Attendance Modal -->
+    <div id="markAttendanceModal" class="modal" style="display:none;">
+        <div class="modal-content" style="text-align: center; max-width: 400px;">
+            <h3 style="margin-bottom: 10px;">Mark Attendance</h3>
+            <div id="digitalClock" class="digital-clock">--:--:--</div>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;" id="currentDate">Loading date...</p>
+            
+            <form id="markAttendanceForm">
+                <div class="form-group">
+                    <input type="text" id="attendanceCode" class="attendance-input" placeholder="X7Z9A2" maxlength="6" required autocomplete="off">
+                </div>
+                <div class="form-row" style="justify-content: center; gap: 10px; margin-top: 20px;">
+                    <button type="button" id="closeMarkAttendanceBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
+                    <button type="submit" class="btn btn-green">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script type="module">
         import { apiFetch, showMessage, getLoadingHTML } from './utils.js';
 
@@ -155,6 +291,31 @@
             const user = sessionRes.data.user;
             document.getElementById('welcomeMsg').textContent = `Welcome, ${user.name}!`;
 
+            // Sidebar Toggle Logic
+            const sidebar = document.querySelector('.sidebar');
+            const menuToggleBtn = document.getElementById('menuToggleBtn');
+            let sidebarOverlay = null;
+
+            const toggleSidebar = () => {
+                sidebar.classList.toggle('open');
+                menuToggleBtn.classList.toggle('open');
+                document.body.classList.toggle('no-scroll');
+                
+                if (sidebar.classList.contains('open')) {
+                    if (!sidebarOverlay) {
+                        sidebarOverlay = document.createElement('div');
+                        sidebarOverlay.className = 'sidebar-overlay';
+                        sidebarOverlay.addEventListener('click', toggleSidebar);
+                        document.body.appendChild(sidebarOverlay);
+                    }
+                    sidebarOverlay.style.display = 'block';
+                } else {
+                    if (sidebarOverlay) sidebarOverlay.style.display = 'none';
+                }
+            };
+
+            if (menuToggleBtn) menuToggleBtn.addEventListener('click', toggleSidebar);
+
             // Logout
             document.getElementById('logoutBtn').addEventListener('click', async () => {
                 await apiFetch('/api/logout', { method: 'POST' });
@@ -165,13 +326,20 @@
             const navLinks = document.querySelectorAll('.sidebar-nav .nav-link');
             const sections = {
                 'dashboard': document.getElementById('dashboardSection'),
+                'calendar': document.getElementById('calendarSection'),
                 'excuses': document.getElementById('excusesSection'),
                 'settings': document.getElementById('settingsSection')
             };
 
+            let calendar;
+
             navLinks.forEach(link => {
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
+                    // Close sidebar on mobile if open
+                    if (window.innerWidth <= 992 && sidebar.classList.contains('open')) {
+                        toggleSidebar();
+                    }
                     // Update active link
                     navLinks.forEach(l => l.classList.remove('active'));
                     e.target.classList.add('active');
@@ -182,22 +350,150 @@
                     if (sections[target]) {
                         sections[target].style.display = 'block';
                         if (target === 'excuses') loadExcuses();
+                        if (target === 'calendar') loadCalendar();
                     }
                 });
             });
 
             // Load Attendance Summary
-            const today = new Date();
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(today.getDate() - 30);
-            
-            const summaryRes = await apiFetch(`/api/student/summary?start=${thirtyDaysAgo.toISOString().split('T')[0]}&end=${today.toISOString().split('T')[0]}`);
-            if (summaryRes && summaryRes.success) {
-                const stats = summaryRes.data;
-                document.getElementById('statPresent').textContent = stats.Present || 0;
-                document.getElementById('statAbsent').textContent = stats.Absent || 0;
-                document.getElementById('statLate').textContent = stats.Late || 0;
-            }
+            const loadStats = async () => {
+                const today = new Date();
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                
+                const summaryRes = await apiFetch(`/api/student/summary?start=${thirtyDaysAgo.toISOString().split('T')[0]}&end=${today.toISOString().split('T')[0]}`);
+                if (summaryRes && summaryRes.success) {
+                    const stats = summaryRes.data;
+                    document.getElementById('statPresent').textContent = stats.Present || 0;
+                    document.getElementById('statAbsent').textContent = stats.Absent || 0;
+                    document.getElementById('statLate').textContent = stats.Late || 0;
+                }
+            };
+            loadStats();
+
+            // Calendar Logic
+            const loadCalendar = async () => {
+                const calendarEl = document.getElementById('attendanceCalendar');
+                
+                // Fetch data
+                const response = await apiFetch('/api/student/attendance-history');
+                let events = [];
+                if (response && response.success) {
+                    events = response.data.map(rec => {
+                        let color = '#3b82f6'; // default primary
+                        if (rec.status === 'Present') color = '#16a34a'; // green
+                        else if (rec.status === 'Absent') color = '#dc2626'; // red
+                        else if (rec.status === 'Late') color = '#f97316'; // orange
+                        
+                        // Handle time format
+                        let start = rec.date;
+                        if (rec.time && rec.time !== '--') {
+                            start += 'T' + rec.time;
+                        }
+
+                        const roomInfo = rec.room_number ? `Rm ${rec.room_number}` : '';
+
+                        return {
+                            title: `${rec.code || 'Class'} ${roomInfo}`,
+                            start: start,
+                            color: color,
+                            allDay: !rec.time || rec.time === '--',
+                            extendedProps: {
+                                status: rec.status,
+                                course: rec.name,
+                                time: rec.time,
+                                room: rec.room_name ? `${rec.room_name} (${rec.room_number})` : '',
+                                teacher: rec.teacher_name
+                            }
+                        };
+                    });
+                }
+
+                if (!calendar) {
+                    calendar = new FullCalendar.Calendar(calendarEl, {
+                        initialView: 'dayGridMonth',
+                        headerToolbar: {
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: 'dayGridMonth,listMonth'
+                        },
+                        events: events,
+                        height: 'auto',
+                        eventClick: function(info) {
+                            const props = info.event.extendedProps;
+                            const timeStr = info.event.allDay ? '' : ` at ${props.time}`;
+                            const roomStr = props.room ? ` in ${props.room}` : '';
+                            const teacherStr = props.teacher ? ` by ${props.teacher}` : '';
+                            showMessage(`${props.course}: ${props.status}${timeStr}${roomStr}${teacherStr}`);
+                        }
+                    });
+                    calendar.render();
+                } else {
+                    calendar.removeAllEvents();
+                    calendar.addEventSource(events);
+                    calendar.render();
+                }
+            };
+
+            // Download PDF Report Logic
+            const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+            downloadPdfBtn.addEventListener('click', async () => {
+                downloadPdfBtn.disabled = true;
+                downloadPdfBtn.textContent = 'Generating...';
+                
+                try {
+                    const response = await apiFetch('/api/student/attendance-history');
+                    if (response && response.success) {
+                        const records = response.data;
+                        const { jsPDF } = window.jspdf;
+                        const doc = new jsPDF();
+                        
+                        // Header
+                        doc.setFontSize(18);
+                        doc.text('Student Attendance Report', 14, 22);
+                        
+                        doc.setFontSize(11);
+                        doc.setTextColor(100);
+                        const studentName = document.getElementById('welcomeMsg').textContent.replace('Welcome, ', '').replace('!', '');
+                        doc.text(`Student: ${studentName}`, 14, 32);
+                        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 38);
+                        
+                        // Table
+                        const tableColumn = ["Date", "Course", "Time", "Status"];
+                        const tableRows = [];
+
+                        records.forEach(rec => {
+                            const courseStr = rec.code ? `${rec.code} - ${rec.name}` : 'N/A';
+                            const rowData = [
+                                rec.date,
+                                courseStr,
+                                rec.time,
+                                rec.status
+                            ];
+                            tableRows.push(rowData);
+                        });
+
+                        doc.autoTable({
+                            head: [tableColumn],
+                            body: tableRows,
+                            startY: 45,
+                            theme: 'grid',
+                            styles: { fontSize: 10 },
+                            headStyles: { fillColor: [59, 130, 246] } // var(--primary)
+                        });
+
+                        doc.save(`attendance_report_${new Date().toISOString().split('T')[0]}.pdf`);
+                    } else {
+                        showMessage('Failed to fetch attendance records.', 'error');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showMessage('Error generating PDF.', 'error');
+                } finally {
+                    downloadPdfBtn.disabled = false;
+                    downloadPdfBtn.textContent = 'Download Report (PDF)';
+                }
+            });
 
             // Load Announcements
             const annRes = await apiFetch('/api/announcements');
@@ -298,6 +594,64 @@
                     changePasswordForm.reset();
                 }
                 btn.disabled = false;
+            });
+
+            // --- Mark Attendance Modal Logic ---
+            const markAttendanceModal = document.getElementById('markAttendanceModal');
+            const openMarkAttendanceBtn = document.getElementById('openMarkAttendanceBtn');
+            const closeMarkAttendanceBtn = document.getElementById('closeMarkAttendanceBtn');
+            const markAttendanceForm = document.getElementById('markAttendanceForm');
+            const attendanceCodeInput = document.getElementById('attendanceCode');
+
+            // Clock Logic
+            const updateClock = () => {
+                const now = new Date();
+                const clockEl = document.getElementById('digitalClock');
+                const dateEl = document.getElementById('currentDate');
+                if (clockEl) clockEl.textContent = now.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                if (dateEl) dateEl.textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            };
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            openMarkAttendanceBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                markAttendanceModal.style.display = 'flex';
+                attendanceCodeInput.value = '';
+                attendanceCodeInput.focus();
+            });
+
+            const closeMarkAttendanceModal = () => {
+                markAttendanceModal.style.display = 'none';
+            };
+
+            closeMarkAttendanceBtn.addEventListener('click', closeMarkAttendanceModal);
+            window.addEventListener('click', (e) => { if (e.target === markAttendanceModal) closeMarkAttendanceModal(); });
+
+            attendanceCodeInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase();
+            });
+
+            markAttendanceForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = markAttendanceForm.querySelector('button[type="submit"]');
+                const originalText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = 'Verifying...';
+
+                const response = await apiFetch('/api/student/attendance/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: attendanceCodeInput.value.trim() })
+                });
+
+                if (response && response.success) {
+                    showMessage(response.data.message);
+                    closeMarkAttendanceModal();
+                    loadStats(); // Refresh dashboard stats
+                }
+                btn.disabled = false;
+                btn.textContent = originalText;
             });
         });
     </script>

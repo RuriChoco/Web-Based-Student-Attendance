@@ -231,17 +231,98 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadAttendanceSection = () => {
         dynamicContentContainer.innerHTML = `
             <div class="card">
-                <h3>Attendance Management</h3>
-                <div class="form-row">
-                    <label>Select Date:</label>
-                    <input type="date" id="selectDate">
+                <div class="card-header" style="margin-bottom: 15px;">
+                    <h3>Attendance Management</h3>
                 </div>
-                <div class="form-row" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h4>Attendance for <span id="attendanceDateDisplay"></span></h4>
-                    <button id="exportCsvBtn" class="btn btn-green">Export to CSV</button>
+                
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Date</label>
+                        <input type="date" id="selectDate">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Room</label>
+                        <select id="selectRoom">
+                            <option value="">All Rooms</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Course</label>
+                        <select id="selectCourse">
+                            <option value="">Select Course...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Year Level Filter</label>
+                        <select id="selectYearLevel">
+                            <option value="">All Years</option>
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="4th Year">4th Year</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Start Time</label>
+                        <div class="input-group-append">
+                            <input type="time" id="sessionStartTime">
+                            <button type="button" id="setStartTimeNowBtn" class="btn-icon" title="Set to current time">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">End Time</label>
+                        <input type="time" id="sessionEndTime">
+                    </div>
+                    <div class="form-group flex-1" style="display: flex; align-items: flex-end; padding-bottom: 1px;">
+                         <button id="generateCodeBtn" class="btn" style="background-color: var(--orange); display: none; width: 100%; height: 42px;">Generate Session Code</button>
+                    </div>
+                </div>
+
+                <div id="sessionInfoPanel" class="session-info-panel">
+                    <div>
+                        <h4 style="margin: 0; color: var(--primary-dark);">Active Session</h4>
+                        <p style="margin: 5px 0 0; color: var(--text-secondary); font-size: 14px;">Share this code with students.</p>
+                    </div>
+                    <div id="sessionCodeDisplay" class="session-code-box"></div>
+                </div>
+
+                <div class="form-row" style="justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 12px;">
+                    <h4 id="attendanceHeader" style="margin: 0;">Select a course to view attendance</h4>
+                    <button id="exportCsvBtn" class="btn btn-green">Export CSV</button>
                 </div>
                 <div class="table-wrapper">
-                    <table id="attendanceTable"><thead><tr><th>Code</th><th>Name</th><th>Time</th><th>Status</th></tr></thead><tbody id="attendanceBody"></tbody></table>
+                    <table id="attendanceTable"><thead><tr><th>Code</th><th>Name</th><th>Course</th><th>Time</th><th>Status</th></tr></thead><tbody id="attendanceBody"></tbody></table>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Recent Sessions</h3>
+                <div class="table-wrapper">
+                    <table id="sessionsTable"><thead><tr><th>Date</th><th>Course</th><th>Room</th><th>Time</th><th>Code</th><th>Attendance</th><th>Created By</th><th>Action</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+            <!-- Edit Session Modal -->
+            <div id="editSessionModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <h3>Edit Session Time</h3>
+                    <form id="editSessionForm">
+                        <input type="hidden" id="editSessionId">
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input type="time" id="editSessionStartTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label>End Time</label>
+                            <input type="time" id="editSessionEndTime">
+                        </div>
+                        <div class="form-row" style="justify-content: flex-end; gap: 10px;">
+                            <button type="button" id="cancelEditSessionBtn" class="btn" style="background-color: var(--text-secondary);">Cancel</button>
+                            <button type="submit" class="btn btn-green">Save Changes</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         `;
@@ -262,655 +343,428 @@ document.addEventListener('DOMContentLoaded', () => {
         initRooms();
     };
 
-    const loadExcusesSection = () => {
-        dynamicContentContainer.innerHTML = `
-            <div class="card">
-                <h3>Pending Excuses</h3>
-                <div class="table-wrapper">
-                    <table><thead><tr><th>CODE</th><th>NAME</th><th>DATE</th><th>REASON</th><th>ACTION</th></tr></thead><tbody id="pendingExcusesBody"></tbody></table>
-                </div>
-            </div>
-            <!-- Edit Excuse Modal -->
-            <div id="editExcuseModal" class="modal" style="display:none;">
-                <div class="modal-content">
-                    <h3>Edit Pending Excuse</h3>
-                    <form id="editExcuseForm">
-                        <input type="hidden" id="editExcuseId">
-                        <div class="form-group">
-                            <label for="editExcuseDate">Date</label>
-                            <input type="date" id="editExcuseDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="editExcuseReason">Reason</label>
-                            <textarea id="editExcuseReason" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-green">Save Changes</button>
-                    </form>
-                </div>
-            </div>
-        `;
-        initExcuses();
-    };
-
-    const loadAnnouncementsSection = () => {
-        dynamicContentContainer.innerHTML = `
-            <div class="card">
-                <h3>Post Announcement</h3>
-                <form id="announcementForm">
-                    <div class="form-group">
-                        <label>Title</label>
-                        <input type="text" id="announcementTitle" required placeholder="Announcement Title">
-                    </div>
-                    <div class="form-group">
-                        <label>Content</label>
-                        <textarea id="announcementContent" required placeholder="Write your announcement here..." style="min-height: 100px;"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-green">Post Announcement</button>
-                </form>
-            </div>
-            <div class="card">
-                <h3>Recent Announcements</h3>
-                <div id="announcementsList"></div>
-            </div>`;
-        initAnnouncements();
-    };
-
-    const loadStaffSection = () => {
-        dynamicContentContainer.innerHTML = `
-            <div class="card">
-                <h3>Staff Management</h3>
-                <p>Create new accounts for teachers and registrars.</p>
-                <form id="addStaffForm">
-                    <div class="form-row">
-                        <div class="form-group flex-1"><label>Full Name</label><input type="text" id="staffName" required></div>
-                        <div class="form-group flex-1"><label>Username</label><input type="text" id="staffUsername" required></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group flex-1"><label>Password</label><input type="password" id="staffPassword" placeholder="Set an initial password" required></div>
-                        <div class="form-group flex-1"><label>Role</label>
-                            <select id="staffRole" required>
-                                <option value="teacher">Teacher</option>
-                                <option value="registrar">Registrar</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row" style="justify-content: flex-end;">
-                        <button type="submit" class="btn">ADD STAFF USER</button>
-                    </div>
-                </form>
-            </div>
-            <div class="card">
-                <h4>Existing Staff</h4>
-                <div class="table-wrapper">
-                    <table id="staffTable"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Actions</th></tr></thead><tbody></tbody></table>
-                </div>
-            </div>`;
-        initStaff();
-    };
-
-    const loadAuditSection = () => {
-        dynamicContentContainer.innerHTML = `
-            <div class="card">
-                <h3>System Audit Log</h3>
-                <p>Showing the most recent system events.</p>
-                <div class="table-wrapper">
-                    <table id="auditLogTable"><thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Details</th></tr></thead><tbody></tbody></table>
-                </div>
-                <div id="auditPaginationControls" class="form-row" style="justify-content: center; margin-top: 12px; display: none;">
-                    <button id="auditPrevPageBtn" class="btn">Previous</button>
-                    <span id="auditPageInfo" style="padding: 0 15px; align-self: center;"></span>
-                    <button id="auditNextPageBtn" class="btn">Next</button>
-                </div>
-            </div>
-        `;
-        initAuditLog();
-    };
-
-    const loadHistorySection = () => {
-        dynamicContentContainer.innerHTML = `
-            <div class="card">
-                <h3>Student Attendance History</h3>
-                <p>Select a student and a date range to view their attendance records.</p>
-                <form id="historyForm">
-                    <div class="form-row">
-                        <div class="form-group flex-2">
-                            <label>Student</label>
-                            <div class="searchable-select-container">
-                                <input type="text" id="historyStudentSearch" placeholder="Type to search for a student..." autocomplete="off" required>
-                                <div id="historyStudentResults" class="searchable-results"></div>
-                            </div>
-                        </div>
-                        <div class="form-group flex-1">
-                            <label>Start Date</label>
-                            <input type="date" id="historyStartDate" required>
-                        </div>
-                        <div class="form-group flex-1">
-                            <label>End Date</label>
-                            <input type="date" id="historyEndDate" required>
-                        </div>
-                    </div>
-                    <div class="form-row" style="justify-content: flex-end;">
-                        <button type="submit" class="btn">Search History</button>
-                    </div>
-                </form>
-            </div>
-            <div class="card" id="historyResultsCard" style="display: none;">
-                <h4 id="historyResultsTitle"></h4>
-                <div class="table-wrapper">
-                    <table id="historyTable"><thead><tr><th>Date</th><th>Status</th><th>Time In</th></tr></thead><tbody></tbody></table>
-                </div>
-            </div>`;
-        initHistorySection();
-    };
-
-    const loadPasswordSection = () => {
-        dynamicContentContainer.innerHTML = `
-            <div class="card">
-                <h3>Change My Password</h3>
-                <form id="changePasswordForm">
-                    <div class="form-group">
-                        <label for="currentPassword">Current Password</label>
-                        <input type="password" id="currentPassword" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="newPassword">New Password</label>
-                        <input type="password" id="newPassword" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirmPassword">Confirm New Password</label>
-                        <input type="password" id="confirmPassword" required>
-                    </div>
-                    <button type="submit" class="btn">Change Password</button>
-                </form>
-            </div>`;
-        initPasswordChange();
-    };
-
-    // --- Navigation ---
-
-    const loadSection = (sectionName) => {
-        navLinks.forEach(link => link.classList.remove('active'));
-        const activeLink = document.querySelector(`.nav-link[data-section="${sectionName}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-            mobileHeaderTitle.textContent = activeLink.textContent;
-        }
-
-        switch (sectionName) {
-            case 'dashboard':
-                loadDashboardSection();
-                break;
-            case 'students':
-                loadStudentsSection();
-                break;
-            case 'attendance':
-                loadAttendanceSection();
-                break;
-            case 'courses':
-                loadCoursesSection();
-                break;
-            case 'rooms':
-                loadRoomsSection();
-                break;
-            case 'registrations':
-                loadRegistrationsSection();
-                break;
-            case 'excuses':
-                loadExcusesSection();
-                break;
-            case 'announcements':
-                loadAnnouncementsSection();
-                break;
-            case 'history':
-                loadHistorySection();
-                break;
-            case 'password':
-                loadPasswordSection();
-                break;
-            case 'staff':
-                loadStaffSection();
-                break;
-            case 'audit':
-                loadAuditSection();
-                break;
-        }
-        // Close sidebar on navigation on mobile
-        if (sidebar.classList.contains('open')) {
-            toggleSidebar();
-        }
-    };
-
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            loadSection(e.target.dataset.section);
-        });
-    });
-
-    const setupSidebar = (user) => {
-        if (!user) return;
-        currentUser = user;
-        userRoleBadge.textContent = user.role;
-
-        const rolePermissions = {
-            admin: ['dashboard', 'students', 'attendance', 'courses', 'rooms', 'registrations', 'excuses', 'announcements', 'history', 'password', 'staff', 'audit'],
-            registrar: ['dashboard', 'students', 'password'],
-            teacher: ['dashboard', 'attendance', 'excuses', 'announcements', 'history', 'password']
-        };
-
-        const allowedSections = rolePermissions[user.role] || [];
-
-        navLinks.forEach(link => {
-            const section = link.dataset.section;
-            if (allowedSections.includes(section)) {
-                link.style.display = 'block';
-            } else {
-                link.style.display = 'none';
-            }
-        });
-
-        // Load the first available section for the user
-        if (allowedSections.length > 0) {
-            loadSection(allowedSections[0]);
-        }
-    };
-
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await apiFetch('/api/logout', { method: 'POST' });
-        showMessage('You have been logged out.');
-        window.location.href = '/login.html';
-    });
-
-    // --- Students Logic ---
-
-    let currentStudentPage = 1;
-    let currentStudentSearch = '';
-    let currentStudentYear = '';
-    let currentStudentCourse = '';
-
-    const renderStudentsTable = async (page = 1, searchTerm = '', yearLevel = '', courseId = '') => {
-        currentStudentPage = page;
-        currentStudentSearch = searchTerm;
-        currentStudentYear = yearLevel;
-        currentStudentCourse = courseId;
-        const tbody = document.getElementById('studentsTable').querySelector('tbody');
-        tbody.innerHTML = getLoadingHTML(6);
-
-        const response = await apiFetch(`/api/students?page=${page}&limit=10&search=${searchTerm}&year_level=${yearLevel}&course_id=${courseId}`);
-        if (!response || !response.success) return;
-
-        const { students, pagination } = response.data;
-        tbody.innerHTML = '';
-        if (students.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6">No students found.</td></tr>`;
-            renderPaginationControls({ totalPages: 0 });
-            return;
-        }
-
-        const canEdit = currentUser && ['admin', 'registrar'].includes(currentUser.role);
-
-        students.forEach(s => {
-            const tr = document.createElement('tr');
-            tr.className = s.gender === 'Male' ? 'gender-m' : 'gender-f';
-            const actionButtons = canEdit ? `
-                <button class="btn btn-green" data-action="edit" data-code="${s.student_code}" data-name="${s.name}" data-age="${s.age}" data-gender="${s.gender}" data-year="${s.year_level || ''}">Edit</button>
-                <button class="btn btn-red" data-action="delete" data-code="${s.student_code}" data-name="${s.name}">Delete</button>
-            ` : '<span>View Only</span>';
-            tr.innerHTML = `
-                <td>${s.student_code}</td><td><a href="#" class="link-style" data-action="view-profile" data-code="${s.student_code}">${s.name}</a></td><td>${s.age}</td><td>${s.gender}</td><td>${s.year_level || '-'}</td>
-                <td>${actionButtons}</td>`;
-            tbody.appendChild(tr);
-        });
-        renderPaginationControls(pagination);
-    };
-
-    const renderPaginationControls = (pagination) => {
-        const paginationControls = document.getElementById('paginationControls');
-        const { currentPage, totalPages } = pagination;
-        if (totalPages <= 1) {
-            paginationControls.style.display = 'none';
-            return;
-        }
-        paginationControls.style.display = 'flex';
-        paginationControls.querySelector('#pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
-        paginationControls.querySelector('#prevPageBtn').disabled = currentPage <= 1;
-        paginationControls.querySelector('#nextPageBtn').disabled = currentPage >= totalPages;
-    };
-
-    const initStudents = () => {
-        const searchInput = document.getElementById('searchStudentInput');
-        const filterYearLevel = document.getElementById('filterYearLevel');
-        const filterCourse = document.getElementById('filterCourse');
-        const studentsTable = document.getElementById('studentsTable');
-        const paginationControls = document.getElementById('paginationControls');
-        const addStudentBtn = document.getElementById('addStudentBtn');
-
-        // Populate Course Filter
-        (async () => {
-            const response = await apiFetch('/api/courses');
-            if (response && response.success) {
-                filterCourse.innerHTML = '<option value="">All Courses</option>';
-                response.data.forEach(c => {
-                    filterCourse.innerHTML += `<option value="${c.id}">${c.code} - ${c.name}</option>`;
-                });
-            }
-        })();
-
-        // Modal elements
-        const modal = document.getElementById('studentFormModal');
-        const form = document.getElementById('studentForm');
-        const formTitle = document.getElementById('studentFormTitle');
-        const cancelBtn = document.getElementById('cancelStudentFormBtn');
-        const editCodeInput = form.querySelector('#editStudentCode');
-
-        const openModal = async (studentData = null) => {
-            form.reset();
-            const stuCodeInput = form.querySelector('#stuCode');
-            const manualCodeInput = form.querySelector('#manualStudentCode');
-            if (studentData) { // Editing
-                formTitle.textContent = 'Edit Student';
-                editCodeInput.value = studentData.code;
-                form.querySelector('#stuName').value = studentData.name;
-                stuCodeInput.value = studentData.code;
-                form.querySelector('#stuAge').value = studentData.age;
-                form.querySelector('#stuGender').value = studentData.gender;
-                form.querySelector('#stuYearLevel').value = studentData.year;
-
-                // Show student code input and make it active for validation
-                form.querySelector('#manualStudentCodeGroup').style.display = 'none';
-                form.querySelector('#studentCodeGroup').style.display = 'block';
-                stuCodeInput.disabled = false;
-                stuCodeInput.required = true;
-
-                // Disable manual code input so it won't be validated while hidden
-                manualCodeInput.disabled = true;
-                manualCodeInput.required = false;
-            } else { // Adding
-                formTitle.textContent = 'Add New Student';
-                editCodeInput.value = '';
-                form.querySelector('#manualStudentCodeGroup').style.display = 'block';
-                form.querySelector('#studentCodeGroup').style.display = 'none';
-
-                // For adding, we use manual code field (optional) and disable the hidden stuCode
-                stuCodeInput.disabled = true;
-                stuCodeInput.required = false;
-
-                manualCodeInput.disabled = false;
-                manualCodeInput.required = false; // optional field
-            }
-            modal.style.display = 'flex';
-        };
-
-        const closeModal = () => {
-            modal.style.display = 'none';
-        };
-
-        addStudentBtn.addEventListener('click', () => openModal());
-        cancelBtn.addEventListener('click', closeModal);
-        window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-        
-        const refreshTable = () => renderStudentsTable(1, searchInput.value, filterYearLevel.value, filterCourse.value);
-        searchInput.addEventListener('input', debounce(refreshTable, 300));
-        filterYearLevel.addEventListener('change', refreshTable);
-        filterCourse.addEventListener('change', refreshTable);
-
-        paginationControls.addEventListener('click', (e) => {
-            if (e.target.id === 'prevPageBtn') {
-                if (currentStudentPage > 1) renderStudentsTable(currentStudentPage - 1, currentStudentSearch, currentStudentYear, currentStudentCourse);
-            } else if (e.target.id === 'nextPageBtn') {
-                renderStudentsTable(currentStudentPage + 1, currentStudentSearch, currentStudentYear, currentStudentCourse);
-            }
-        });
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            const student = {
-                name: form.querySelector('#stuName').value.trim(),
-                age: form.querySelector('#stuAge').value,
-                gender: form.querySelector('#stuGender').value,
-                year_level: form.querySelector('#stuYearLevel').value,
-                student_code: form.querySelector('#stuCode').value.trim(), // For edits
-            };
-            const editCode = editCodeInput.value;
-
-            // Only add student_code for new students
-            if (!editCode) {
-                student.student_code = form.querySelector('#manualStudentCode').value.trim();
-            }
-
-            const url = editCode ? `/api/students/${editCode}` : '/api/students';
-            const method = editCode ? 'PUT' : 'POST';
-
-            const result = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(student) });
-
-            if (result) {
-                showMessage(editCode ? 'Student updated successfully.' : 'Student added successfully.');
-                closeModal();
-                searchInput.value = '';
-                refreshTable();
-            }
-            submitBtn.disabled = false;
-        });
-
-        studentsTable.addEventListener('click', async (e) => {
-            if (!e.target.matches('button, a')) return;
-            const { action, code, name, age, gender, year } = e.target.dataset;
-
-            if (action === 'delete') {
-                if (confirm(`Are you sure you want to delete ${name} (${code})? This action is permanent.`)) {
-                    const result = await apiFetch(`/api/students/${code}`, { method: 'DELETE' });
-                    if (result) {
-                        showMessage('Student deleted.');
-                        refreshTable();
-                    }
-                }
-            } else if (action === 'edit') {
-                openModal({ code, name, age, gender, year });
-            } else if (action === 'view-profile') {
-                e.preventDefault();
-                openProfileModal(code);
-            }
-        });
-
-        renderStudentsTable();
-    };
-
-    const initBulkUpload = () => {
-        const form = document.getElementById('bulkUploadForm');
-        if (!form) return;
-
-        const resultDiv = document.getElementById('bulkUploadResult');
-        const fileInput = document.getElementById('studentCsv');
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitBtn = form.querySelector('button');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'UPLOADING...';
-            resultDiv.style.display = 'none';
-            resultDiv.innerHTML = '';
-
-            if (!fileInput.files || fileInput.files.length === 0) {
-                showMessage('Please select a CSV file to upload.', 'error');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'UPLOAD';
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('studentCsv', fileInput.files[0]);
-
-            const response = await apiFetch('/api/students/upload-csv', { method: 'POST', body: formData });
-
-            if (response && response.success) {
-                const { message, errors, totalRows } = response.data;
-                showMessage(message);
-                resultDiv.style.display = 'block';
-
-                let errorHtml = '';
-                if (errors && errors.length > 0) {
-                    errorHtml = '<h4>Upload Errors:</h4><ul>' + errors.map(err => `<li><strong>${err.student || 'Unknown Row'}:</strong> ${err.error}</li>`).join('') + '</ul>';
-                }
-
-                resultDiv.innerHTML = `<p>Processed ${totalRows} rows.</p>${errorHtml}`;
-                renderStudentsTable(1, ''); // Refresh the student list
-            }
-
-            form.reset();
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'UPLOAD';
-        });
-    };
-
     // --- Attendance Logic ---
 
     const initAttendance = () => {
+        // 1. Select DOM elements
         const selectDateField = document.getElementById('selectDate');
         const attendanceBody = document.getElementById('attendanceBody');
-        const attendanceTitle = document.querySelector('#attendanceDateDisplay').parentNode; // Parent h4
-        const dateDisplay = document.getElementById('attendanceDateDisplay');
+        const attendanceHeader = document.getElementById('attendanceHeader');
+        const generateCodeBtn = document.getElementById('generateCodeBtn');
+        const sessionCodeDisplay = document.getElementById('sessionCodeDisplay');
+        const sessionInfoPanel = document.getElementById('sessionInfoPanel');
         const exportBtn = document.getElementById('exportCsvBtn');
         
-        let currentCourse = null;
-        let currentCourseName = '';
+        const selectRoom = document.getElementById('selectRoom');
+        const selectCourse = document.getElementById('selectCourse');
+        const selectYearLevel = document.getElementById('selectYearLevel');
+        const sessionStartTime = document.getElementById('sessionStartTime');
+        const sessionEndTime = document.getElementById('sessionEndTime');
+        const setStartTimeNowBtn = document.getElementById('setStartTimeNowBtn');
+        const sessionsTableBody = document.getElementById('sessionsTable').querySelector('tbody');
 
-        // Add Select Course Button dynamically to the header
-        const headerRow = document.querySelector('.card .form-row:nth-of-type(2)');
-        if (headerRow && !document.getElementById('selectCourseBtn')) {
-            const selectCourseBtn = document.createElement('button');
-            selectCourseBtn.id = 'selectCourseBtn';
-            selectCourseBtn.className = 'btn';
-            selectCourseBtn.textContent = 'Select Course';
-            selectCourseBtn.style.marginRight = '10px';
-            headerRow.insertBefore(selectCourseBtn, exportBtn);
+        // Edit Session Modal Elements
+        const editSessionModal = document.getElementById('editSessionModal');
+        const editSessionForm = document.getElementById('editSessionForm');
+        const cancelEditSessionBtn = document.getElementById('cancelEditSessionBtn');
 
-            // Course Selection Modal Logic
-            const courseModal = document.getElementById('courseSelectionModal');
-            const courseSelect = document.getElementById('selectedCourseId');
-            const cancelCourseBtn = document.getElementById('cancelCourseSelectionBtn');
+        let allCourses = [];
 
-            const populateCourses = async () => {
-                const response = await apiFetch('/api/courses');
-                if (response && response.success) {
-                    courseSelect.innerHTML = '<option value="">Select a course...</option>';
-                    response.data.forEach(course => {
-                        const option = document.createElement('option');
-                        option.value = course.id;
-                        option.textContent = `${course.code} - ${course.name}`;
-                        courseSelect.appendChild(option);
-                    });
-                }
-            };
-
-            selectCourseBtn.addEventListener('click', async () => {
-                await populateCourses();
-                courseModal.style.display = 'flex';
-            });
-
-            const closeCourseModal = () => {
-                courseModal.style.display = 'none';
-            };
-
-            cancelCourseBtn.addEventListener('click', closeCourseModal);
-            
-            // Handle Course Confirmation
-            const courseSelectionForm = document.getElementById('courseSelectionForm');
-            courseSelectionForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                currentCourse = courseSelect.value;
-                currentCourseName = courseSelect.options[courseSelect.selectedIndex].text;
-                if (currentCourse) {
-                    attendanceTitle.innerHTML = `Attendance for <span id="attendanceDateDisplay">${selectDateField.value}</span> in <strong>${currentCourseName}</strong>`;
-                    loadAttendanceByDate();
-                }
-                closeCourseModal();
-            });
-        }
-
+        // 2. Define Helper Functions (BEFORE usage)
         const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
         const loadAttendanceByDate = async () => {
             const date = selectDateField.value;
-            if (!date) {
-                attendanceBody.innerHTML = '<tr><td colspan="4">Select a date to view attendance.</td></tr>';
-                return;
-            }
+            const roomId = selectRoom.value;
+            const courseId = selectCourse.value;
+            const yearLevel = selectYearLevel.value;
+
+            // UI Reset
+            attendanceBody.innerHTML = '';
             
-            const displayDate = document.getElementById('attendanceDateDisplay');
-            if (displayDate) displayDate.textContent = date;
-
-            attendanceBody.innerHTML = getLoadingHTML(4);
-
-            if (!currentCourse) {
-                attendanceBody.innerHTML = '<tr><td colspan="4">Please select a course to view attendance.</td></tr>';
+            if (!date) {
+                attendanceBody.innerHTML = '<tr><td colspan="5">Select a date to view attendance.</td></tr>';
+                generateCodeBtn.style.display = 'none';
+                sessionInfoPanel.style.display = 'none';
                 return;
             }
+
+            if (!courseId && !roomId) {
+                attendanceHeader.textContent = 'Select a course or room to view attendance';
+                attendanceBody.innerHTML = '<tr><td colspan="5">Please select a course or room.</td></tr>';
+                generateCodeBtn.style.display = 'none';
+                sessionInfoPanel.style.display = 'none';
+                return;
+            }
+
+            if (courseId) {
+                const courseName = selectCourse.options[selectCourse.selectedIndex].text;
+                attendanceHeader.innerHTML = `Attendance for <strong>${courseName}</strong> on ${date}`;
+                generateCodeBtn.style.display = 'block';
+            } else {
+                const roomName = selectRoom.options[selectRoom.selectedIndex].text;
+                attendanceHeader.innerHTML = `Attendance for Room <strong>${roomName}</strong> on ${date}`;
+                generateCodeBtn.style.display = 'none'; // Hide generate button when viewing by room
+            }
+
+            attendanceBody.innerHTML = getLoadingHTML(5);
 
             // Append course to query
-            const url = `/api/attendance/${date}?course_id=${currentCourse}`;
+            const params = new URLSearchParams();
+            if (courseId) params.append('course_id', courseId);
+            if (roomId) params.append('room_id', roomId);
+            if (yearLevel) params.append('year_level', yearLevel);
+            const url = `/api/attendance/${date}?${params.toString()}`;
 
             const response = await apiFetch(url);
-            if (!response || !response.success) return;
+            if (!response || !response.success) {
+                 attendanceBody.innerHTML = '<tr><td colspan="5">Error loading attendance.</td></tr>';
+                 return;
+            }
 
             const attendanceList = response.data || [];
             attendanceBody.innerHTML = '';
+            
             if (attendanceList.length === 0) {
-                attendanceBody.innerHTML = '<tr><td colspan="4">No students enrolled in this course.</td></tr>';
+                attendanceBody.innerHTML = '<tr><td colspan="5">No students found for this selection.</td></tr>';
                 return;
             }
+
             attendanceList.forEach(rec => {
                 const tr = document.createElement('tr');
+                
+                // Status Color Logic
+                let statusColor = '';
+                if(rec.status === 'Present') statusColor = 'color: var(--green); font-weight: bold;';
+                else if(rec.status === 'Late') statusColor = 'color: var(--orange); font-weight: bold;';
+                else if(rec.status === 'Absent') statusColor = 'color: var(--red); font-weight: bold;';
+                else if(rec.status === 'Excused') statusColor = 'color: var(--primary); font-weight: bold;';
+
                 tr.innerHTML = `
-                    <td>${rec.student_code}</td><td>${rec.name}</td><td>${rec.time}</td>
+                    <td>${rec.student_code}</td>
+                    <td>${rec.name} <small class="text-secondary">(${rec.year_level || 'N/A'})</small></td>
+                    <td>${rec.course_code || '-'}</td>
+                    <td>${rec.time}</td>
                     <td>
-                        <select data-code="${rec.student_code}" data-date="${rec.date}">
-                            <option ${rec.status === 'Present' ? 'selected' : ''}>Present</option>
-                            <option ${rec.status === 'Late' ? 'selected' : ''}>Late</option>
-                            <option ${rec.status === 'Absent' ? 'selected' : ''}>Absent</option>
-                            <option ${rec.status === 'Excused' ? 'selected' : ''}>Excused</option>
+                        <select data-code="${rec.student_code}" data-date="${rec.date}" style="${statusColor}">
+                            <option value="Present" ${rec.status === 'Present' ? 'selected' : ''}>Present</option>
+                            <option value="Late" ${rec.status === 'Late' ? 'selected' : ''}>Late</option>
+                            <option value="Absent" ${rec.status === 'Absent' ? 'selected' : ''}>Absent</option>
+                            <option value="Excused" ${rec.status === 'Excused' ? 'selected' : ''}>Excused</option>
                         </select>
                     </td>`;
                 attendanceBody.appendChild(tr);
             });
         };
 
-        selectDateField.addEventListener('change', loadAttendanceByDate);
+        const populateCourses = () => {
+            const currentCourseId = selectCourse.value; 
+            
+            selectCourse.innerHTML = '<option value="">Select Course...</option>';
 
-        // Use event delegation on the table itself. This is safer than attaching to the whole mainContent.
-        // The table is inside dynamicContentContainer now.
-        const attendanceTable = dynamicContentContainer.querySelector('#attendanceTable');
+            if (!allCourses || allCourses.length === 0) return;
+
+            // Show ALL courses regardless of room selection
+            allCourses.forEach(course => {
+                const opt = document.createElement('option');
+                opt.value = course.id;
+                opt.textContent = `${course.code} - ${course.name}`;
+                opt.dataset.startTime = course.start_time || '';
+                opt.dataset.endTime = course.end_time || '';
+                selectCourse.appendChild(opt);
+            });
+            
+            // Restore selection if valid
+            if (currentCourseId && allCourses.find(c => String(c.id) === String(currentCourseId))) {
+                selectCourse.value = currentCourseId;
+            } else {
+                // If selection invalid (e.g. switched room), reset start time
+                sessionStartTime.value = '';
+                sessionEndTime.value = '';
+            }
+        };
+
+        // --- Edit Session Logic ---
+        const openEditSessionModal = (id, start, end) => {
+            document.getElementById('editSessionId').value = id;
+            document.getElementById('editSessionStartTime').value = start;
+            document.getElementById('editSessionEndTime').value = end;
+            editSessionModal.style.display = 'flex';
+        };
+
+        const closeEditSessionModal = () => {
+            editSessionModal.style.display = 'none';
+            editSessionForm.reset();
+        };
+
+        cancelEditSessionBtn.addEventListener('click', closeEditSessionModal);
+        window.addEventListener('click', (e) => { if (e.target === editSessionModal) closeEditSessionModal(); });
+
+        editSessionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editSessionId').value;
+            const start_time = document.getElementById('editSessionStartTime').value;
+            const end_time = document.getElementById('editSessionEndTime').value;
+
+            const response = await apiFetch(`/api/attendance/sessions/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_time, end_time })
+            });
+
+            if (response && response.success) {
+                showMessage('Session updated successfully.');
+                closeEditSessionModal();
+                loadSessions();
+            }
+        });
+
+        const loadSessions = async () => {
+            sessionsTableBody.innerHTML = getLoadingHTML(8);
+            const response = await apiFetch('/api/attendance/sessions');
+            if (!response || !response.success) {
+                sessionsTableBody.innerHTML = '<tr><td colspan="8">Error loading sessions.</td></tr>';
+                return;
+            }
+            const sessions = response.data;
+            sessionsTableBody.innerHTML = '';
+            if (sessions.length === 0) {
+                sessionsTableBody.innerHTML = '<tr><td colspan="8">No recent sessions found.</td></tr>';
+                return;
+            }
+            sessions.forEach(s => {
+                const tr = document.createElement('tr');
+                const roomStr = s.room_name ? `${s.room_name} (${s.room_number})` : 'N/A';
+                const timeStr = `${s.start_time || '?'} - ${s.end_time || '?'}`;
+                tr.innerHTML = `
+                    <td>${s.date}</td>
+                    <td>${s.course_code}</td>
+                    <td>${roomStr}</td>
+                    <td>${timeStr}</td>
+                    <td><span class="session-code-box" style="font-size: 14px; padding: 2px 8px;">${s.code}</span></td>
+                    <td>
+                        <span class="status-Present">${s.present_count} Present</span> / 
+                        <span class="status-Absent">${s.absent_count} Absent</span>
+                    </td>
+                    <td>${s.creator_name || 'Unknown'}</td>
+                    <td>
+                        <button class="btn btn-green" style="padding: 5px 10px; font-size: 12px;" 
+                            data-action="view-session" 
+                            data-date="${s.date}" 
+                            data-course="${s.course_id}"
+                            data-room="${s.room_id || ''}"
+                            data-start="${s.start_time || ''}"
+                            data-end="${s.end_time || ''}"
+                            data-code="${s.code}">
+                            View
+                        </button>
+                        <button class="btn" style="background-color: #fbbf24; padding: 5px 10px; font-size: 12px; margin-left: 5px;" 
+                            data-action="edit-session" 
+                            data-id="${s.id}"
+                            data-start="${s.start_time || ''}"
+                            data-end="${s.end_time || ''}">
+                            Edit
+                        </button>
+                        <button class="btn btn-red" style="padding: 5px 10px; font-size: 12px; margin-left: 5px;" 
+                            data-action="delete-session" 
+                            data-id="${s.id}"
+                            data-code="${s.code}">
+                            Delete
+                        </button>
+                    </td>
+                `;
+                sessionsTableBody.appendChild(tr);
+            });
+        };
+
+        if (setStartTimeNowBtn) {
+            setStartTimeNowBtn.addEventListener('click', () => {
+                sessionStartTime.value = new Date().toTimeString().slice(0, 5);
+            });
+        }
+
+        // 3. Event Listeners
+        selectRoom.addEventListener('change', () => {
+            // Reset course selection to show all students in the room by default
+            selectCourse.value = "";
+            sessionStartTime.value = "";
+            sessionEndTime.value = "";
+            
+            loadAttendanceByDate();
+        });
+
+        selectCourse.addEventListener('change', () => {
+            const selectedOption = selectCourse.options[selectCourse.selectedIndex];
+            if (selectedOption.dataset.startTime) {
+                sessionStartTime.value = selectedOption.dataset.startTime;
+                sessionEndTime.value = selectedOption.dataset.endTime || '';
+            } else {
+                sessionStartTime.value = '';
+                sessionEndTime.value = '';
+            }
+            sessionInfoPanel.style.display = 'none';
+            loadAttendanceByDate();
+        });
+
+        selectYearLevel.addEventListener('change', loadAttendanceByDate);
+        selectDateField.addEventListener('change', () => {
+            sessionInfoPanel.style.display = 'none';
+            loadAttendanceByDate();
+        });
+
+        // Table Event Delegation
+        const attendanceTable = document.getElementById('attendanceTable');
         if (attendanceTable) {
+            // Remove old listener if any (though initAttendance is usually called once per section load)
+            // Since we are replacing innerHTML of dynamicContentContainer, old listeners on elements inside it are gone.
             attendanceTable.addEventListener('change', async (e) => {
                 if (!e.target.matches('select')) return;
                 const select = e.target;
-                select.disabled = true; // Disable while processing for better UX
+                const originalColor = select.style.cssText;
+                const originalValue = select.getAttribute('data-original-value') || select.value; // fallback
+                
+                select.disabled = true; 
                 const update = {
                     student_code: select.dataset.code,
                     date: select.dataset.date,
-                    course_id: currentCourse,
+                    course_id: selectCourse.value,
+                    session_start_time: sessionStartTime.value,
                     status: select.value
                 };
+
                 const result = await apiFetch('/api/attendance', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(update)
                 });
-                if (result) loadAttendanceByDate(); // Reload to get updated timestamp and confirm change
+                
+                select.disabled = false;
+                
+                if (result && result.success) {
+                    let statusColor = '';
+                    if(select.value === 'Present') statusColor = 'color: var(--green); font-weight: bold;';
+                    else if(select.value === 'Late') statusColor = 'color: var(--orange); font-weight: bold;';
+                    else if(select.value === 'Absent') statusColor = 'color: var(--red); font-weight: bold;';
+                    else if(select.value === 'Excused') statusColor = 'color: var(--primary); font-weight: bold;';
+                    select.style.cssText = statusColor;
+                } else {
+                    select.value = originalValue; 
+                    select.style.cssText = originalColor;
+                }
             });
         }
-        exportBtn.addEventListener('click', () => {
+
+        sessionsTableBody.addEventListener('click', async (e) => {
+            if (e.target.matches('button[data-action="view-session"]')) {
+                const btn = e.target;
+                const { date, course, room, start, end, code } = btn.dataset;
+
+                selectDate.value = date;
+                selectRoom.value = room; 
+                
+                // Re-populate courses based on room (though currently we show all, this ensures consistency)
+                populateCourses(); 
+                selectCourse.value = course;
+                
+                sessionStartTime.value = start;
+                sessionEndTime.value = end;
+                
+                sessionCodeDisplay.textContent = code;
+                sessionInfoPanel.style.display = 'flex';
+
+                loadAttendanceByDate();
+                document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+            } else if (e.target.matches('button[data-action="edit-session"]')) {
+                const btn = e.target;
+                const { id, start, end } = btn.dataset;
+                openEditSessionModal(id, start, end);
+            } else if (e.target.matches('button[data-action="delete-session"]')) {
+                const btn = e.target;
+                const { id, code } = btn.dataset;
+                
+                if (confirm(`Are you sure you want to delete session ${code}? This will remove all attendance records for this session.`)) {
+                    btn.disabled = true;
+                    const response = await apiFetch(`/api/attendance/sessions/${id}`, { method: 'DELETE' });
+                    if (response && response.success) {
+                        showMessage('Session deleted successfully.');
+                        loadSessions();
+                        // Clear the view if the deleted session was currently selected
+                        if (sessionCodeDisplay.textContent === code) {
+                            sessionInfoPanel.style.display = 'none';
+                        }
+                    } else {
+                        btn.disabled = false;
+                    }
+                }
+            }
+        });
+
+        generateCodeBtn.addEventListener('click', async () => {
             const date = selectDateField.value;
-            if (!date) {
-                showMessage('Please select a date to export.', 'error');
+            const roomId = selectRoom.value;
+            const courseId = selectCourse.value;
+            const startTime = sessionStartTime.value;
+            const endTime = sessionEndTime.value;
+
+            if (!date || !courseId || !startTime) {
+                showMessage('Please select a date, course, and ensure start time is set.', 'error');
                 return;
             }
-            window.location.href = `/api/attendance/${date}/csv?course_id=${currentCourse || ''}`;
+
+            generateCodeBtn.disabled = true;
+            generateCodeBtn.textContent = 'Generating...';
+            
+            const response = await apiFetch('/api/attendance/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ course_id: courseId, date, start_time: startTime, end_time: endTime, room_id: roomId })
+            });
+
+            generateCodeBtn.disabled = false;
+            generateCodeBtn.textContent = 'Generate Session Code';
+            
+            if (response && response.success) {
+                sessionCodeDisplay.textContent = response.data.code; // Just the code
+                sessionInfoPanel.style.display = 'flex';
+                loadSessions(); // Refresh the list
+            }
         });
+
+        exportBtn.addEventListener('click', () => {
+            const date = selectDateField.value;
+            const courseId = selectCourse.value;
+            if (!date || !courseId) {
+                showMessage('Please select a date and course to export.', 'error');
+                return;
+            }
+            window.location.href = `/api/attendance/${date}/csv?course_id=${courseId}`;
+        });
+
+        // 4. Initialization
         selectDateField.value = getTodayDateString();
-        // Don't load immediately, wait for course selection
-        attendanceBody.innerHTML = '<tr><td colspan="4">Please select a course to view attendance.</td></tr>';
+        
+        (async () => {
+            // Load Rooms
+            const roomRes = await apiFetch('/api/rooms');
+            if (roomRes && roomRes.success) {
+                selectRoom.innerHTML = '<option value="">All Rooms</option>';
+                roomRes.data.forEach(room => {
+                    const opt = document.createElement('option');
+                    opt.value = room.id;
+                    opt.textContent = `${room.name} (${room.room_number})`;
+                    selectRoom.appendChild(opt);
+                });
+                selectRoom.value = "";
+            }
+
+            // Load Courses
+            const courseRes = await apiFetch('/api/courses');
+            if (courseRes && courseRes.success) {
+                allCourses = courseRes.data;
+                populateCourses();
+            }
+            loadSessions();
+        })();
     };
 
     // --- Courses Management Logic ---
@@ -1161,6 +1015,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const roomNameInput = document.getElementById('roomName');
         const roomNumberInput = document.getElementById('roomNumber');
         const editIdInput = document.getElementById('editRoomId');
+        
+        const scheduleModal = document.getElementById('roomScheduleModal');
+        const closeScheduleBtn = document.getElementById('closeRoomScheduleBtn');
+        const scheduleGrid = document.getElementById('scheduleGrid');
+        const scheduleTitle = document.getElementById('roomScheduleTitle');
 
         const renderRooms = async () => {
             tableBody.innerHTML = getLoadingHTML(2);
@@ -1181,6 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${room.name}</td>
                     <td>${room.room_number}</td>
                     <td>
+                        <button class="btn" style="background-color: var(--blue);" data-action="schedule" data-id="${room.id}" data-name="${room.name}">Schedule</button>
                         <button class="btn btn-green" data-action="edit" data-id="${room.id}" data-name="${room.name}" data-number="${room.room_number}">Edit</button>
                         <button class="btn btn-red" data-action="delete" data-id="${room.id}" data-name="${room.name}">Delete</button>
                     </td>
@@ -1212,6 +1072,78 @@ document.addEventListener('DOMContentLoaded', () => {
         addBtn.addEventListener('click', () => openModal());
         cancelBtn.addEventListener('click', closeModal);
         window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        
+        closeScheduleBtn.addEventListener('click', () => scheduleModal.style.display = 'none');
+        window.addEventListener('click', (e) => { if (e.target === scheduleModal) scheduleModal.style.display = 'none'; });
+
+        const openScheduleModal = async (roomId, roomName) => {
+            scheduleTitle.textContent = `Schedule: ${roomName}`;
+            scheduleGrid.innerHTML = getLoadingHTML(7);
+            scheduleModal.style.display = 'flex';
+
+            const response = await apiFetch(`/api/rooms/${roomId}/schedule`);
+            if (!response || !response.success) {
+                scheduleGrid.innerHTML = '<div style="grid-column: 1/-1; padding: 20px;">Error loading schedule.</div>';
+                return;
+            }
+
+            const courses = response.data;
+            scheduleGrid.innerHTML = '';
+
+            // 1. Render Time Labels (7:00 to 21:00, 30 min intervals)
+            const startHour = 7;
+            const endHour = 21;
+            const slotsPerHour = 2;
+            const totalSlots = (endHour - startHour) * slotsPerHour;
+
+            for (let i = 0; i < totalSlots; i++) {
+                const hour = Math.floor(startHour + i / 2);
+                const min = (i % 2) === 0 ? '00' : '30';
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'time-label';
+                timeLabel.textContent = `${hour}:${min}`;
+                timeLabel.style.gridRow = `${i + 1} / span 1`;
+                scheduleGrid.appendChild(timeLabel);
+            }
+
+            // 2. Render Vertical Column Lines (Mon-Sat)
+            for (let i = 0; i < 6; i++) {
+                const line = document.createElement('div');
+                line.className = 'day-col-line';
+                line.style.gridColumn = `${i + 2} / span 1`;
+                scheduleGrid.appendChild(line);
+            }
+
+            // 3. Render Courses
+            const dayMap = { 'Mon': 2, 'Tue': 3, 'Wed': 4, 'Thu': 5, 'Fri': 6, 'Sat': 7 };
+
+            courses.forEach(course => {
+                if (!course.days || !course.start_time || !course.end_time) return;
+
+                const days = course.days.split(',');
+                const [startH, startM] = course.start_time.split(':').map(Number);
+                const [endH, endM] = course.end_time.split(':').map(Number);
+
+                const startSlot = (startH - startHour) * 2 + (startM >= 30 ? 1 : 0);
+                const endSlot = (endH - startHour) * 2 + (endM >= 30 ? 1 : 0);
+                const duration = endSlot - startSlot;
+
+                if (startSlot < 0 || endSlot > totalSlots) return;
+
+                days.forEach(day => {
+                    const col = dayMap[day.trim()];
+                    if (!col) return;
+
+                    const eventDiv = document.createElement('div');
+                    eventDiv.className = 'schedule-event';
+                    eventDiv.innerHTML = `<strong>${course.code}</strong>${course.name}`;
+                    eventDiv.style.gridColumn = `${col} / span 1`;
+                    eventDiv.style.gridRow = `${startSlot + 1} / span ${duration}`;
+                    eventDiv.title = `${course.code}: ${course.name} (${course.start_time} - ${course.end_time})`;
+                    scheduleGrid.appendChild(eventDiv);
+                });
+            });
+        };
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1247,6 +1179,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         renderRooms();
                     }
                 }
+            } else if (action === 'schedule') {
+                openScheduleModal(id, name);
             }
         });
 
@@ -1377,6 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initExcuses = () => {
         const pendingExcusesBody = document.getElementById('pendingExcusesBody');
+        const historyTableBody = document.getElementById('excuseHistoryTable').querySelector('tbody');
 
         const renderPendingExcuses = async () => {
             pendingExcusesBody.innerHTML = getLoadingHTML(5);
@@ -1402,6 +1337,31 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
 
+        const renderExcuseHistory = async () => {
+            historyTableBody.innerHTML = getLoadingHTML(5);
+            const response = await apiFetch('/api/excuses/history');
+            if (!response || !response.success) return;
+
+            const excuses = response.data || [];
+            historyTableBody.innerHTML = '';
+            if (excuses.length === 0) {
+                historyTableBody.innerHTML = '<tr><td colspan="5">No history found.</td></tr>';
+                return;
+            }
+            excuses.forEach(e => {
+                const tr = document.createElement('tr');
+                let statusColor = e.status === 'Approved' ? 'color: var(--green); font-weight: bold;' : 'color: var(--red); font-weight: bold;';
+                tr.innerHTML = `
+                    <td>${e.student_name} <small class="text-secondary">(${e.student_code})</small></td>
+                    <td>${e.date}</td>
+                    <td>${e.reason}</td>
+                    <td style="${statusColor}">${e.status}</td>
+                    <td>${e.processor_name || 'Unknown'}</td>
+                `;
+                historyTableBody.appendChild(tr);
+            });
+        };
+
         pendingExcusesBody.addEventListener('click', async (e) => {
             if (e.target.matches('button')) {
                 const button = e.target;
@@ -1419,6 +1379,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (result) {
                         showMessage(`Excuse has been ${action}d.`);
                         renderPendingExcuses();
+                        renderExcuseHistory(); // Refresh history if loaded
                     } else {
                         button.disabled = false;
                     }
@@ -1465,6 +1426,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderPendingExcuses();
             }
         });
+
+        // Tab Logic
+        const tabsContainer = document.querySelector('.card-tabs');
+        if (tabsContainer) {
+            tabsContainer.addEventListener('click', (e) => {
+                if (!e.target.matches('.card-tab-btn')) return;
+                const tabId = e.target.dataset.tab;
+                document.querySelectorAll('.card-tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                document.querySelectorAll('.card-tab-content').forEach(c => c.style.display = c.id === tabId ? 'block' : 'none');
+                if (tabId === 'history-excuses') renderExcuseHistory();
+            });
+        }
 
         renderPendingExcuses();
     };
@@ -1839,6 +1813,488 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderAuditLog(1);
     };
+
+    // --- Missing Section Loaders ---
+
+    const loadExcusesSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h3>Excuses Management</h3>
+                </div>
+                <div class="card-tabs">
+                    <button class="card-tab-btn active" data-tab="pending-excuses">Pending</button>
+                    <button class="card-tab-btn" data-tab="history-excuses">History</button>
+                </div>
+                <div id="pending-excuses" class="card-tab-content">
+                    <div class="table-wrapper"><table><thead><tr><th>CODE</th><th>NAME</th><th>DATE</th><th>REASON</th><th>ACTION</th></tr></thead><tbody id="pendingExcusesBody"></tbody></table></div>
+                </div>
+                <div id="history-excuses" class="card-tab-content" style="display:none;">
+                    <div class="table-wrapper"><table id="excuseHistoryTable"><thead><tr><th>Student</th><th>Date</th><th>Reason</th><th>Status</th><th>Processed By</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+            <!-- Edit Excuse Modal -->
+            <div id="editExcuseModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <h3>Edit Pending Excuse</h3>
+                    <form id="editExcuseForm">
+                        <input type="hidden" id="editExcuseId">
+                        <div class="form-group">
+                            <label for="editExcuseDate">Date</label>
+                            <input type="date" id="editExcuseDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editExcuseReason">Reason</label>
+                            <textarea id="editExcuseReason" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-green">Save Changes</button>
+                    </form>
+                </div>
+            </div>
+        `;
+        initExcuses();
+    };
+
+    const loadAnnouncementsSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Post Announcement</h3>
+                <form id="announcementForm">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="announcementTitle" required placeholder="Announcement Title">
+                    </div>
+                    <div class="form-group">
+                        <label>Content</label>
+                        <textarea id="announcementContent" required placeholder="Write your announcement here..." style="min-height: 100px;"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-green">Post Announcement</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>Recent Announcements</h3>
+                <div id="announcementsList"></div>
+            </div>`;
+        initAnnouncements();
+    };
+
+    const loadStaffSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Staff Management</h3>
+                <p>Create new accounts for teachers and registrars.</p>
+                <form id="addStaffForm">
+                    <div class="form-row">
+                        <div class="form-group flex-1"><label>Full Name</label><input type="text" id="staffName" required></div>
+                        <div class="form-group flex-1"><label>Username</label><input type="text" id="staffUsername" required></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group flex-1"><label>Password</label><input type="password" id="staffPassword" placeholder="Set an initial password" required></div>
+                        <div class="form-group flex-1"><label>Role</label>
+                            <select id="staffRole" required>
+                                <option value="teacher">Teacher</option>
+                                <option value="registrar">Registrar</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row" style="justify-content: flex-end;">
+                        <button type="submit" class="btn">ADD STAFF USER</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card">
+                <h4>Existing Staff</h4>
+                <div class="table-wrapper">
+                    <table id="staffTable"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Actions</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>`;
+        initStaff();
+    };
+
+    const loadHistorySection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Student Attendance History</h3>
+                <p>Select a student and a date range to view their attendance records.</p>
+                <form id="historyForm">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label>Student</label>
+                            <div class="searchable-select-container">
+                                <input type="text" id="historyStudentSearch" placeholder="Type to search for a student..." autocomplete="off" required>
+                                <div id="historyStudentResults" class="searchable-results"></div>
+                            </div>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Start Date</label>
+                            <input type="date" id="historyStartDate" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>End Date</label>
+                            <input type="date" id="historyEndDate" required>
+                        </div>
+                    </div>
+                    <div class="form-row" style="justify-content: flex-end;">
+                        <button type="submit" class="btn">Search History</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card" id="historyResultsCard" style="display: none;">
+                <h4 id="historyResultsTitle"></h4>
+                <div class="table-wrapper">
+                    <table id="historyTable"><thead><tr><th>Date</th><th>Status</th><th>Time In</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>`;
+        initHistorySection();
+    };
+
+    const loadPasswordSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>Change My Password</h3>
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn">Change Password</button>
+                </form>
+            </div>`;
+        initPasswordChange();
+    };
+
+    const loadAuditSection = () => {
+        dynamicContentContainer.innerHTML = `
+            <div class="card">
+                <h3>System Audit Log</h3>
+                <p>Showing the most recent system events.</p>
+                <div class="table-wrapper">
+                    <table id="auditLogTable"><thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Details</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div id="auditPaginationControls" class="form-row" style="justify-content: center; margin-top: 12px; display: none;">
+                    <button id="auditPrevPageBtn" class="btn">Previous</button>
+                    <span id="auditPageInfo" style="padding: 0 15px; align-self: center;"></span>
+                    <button id="auditNextPageBtn" class="btn">Next</button>
+                </div>
+            </div>
+        `;
+        initAuditLog();
+    };
+
+    // --- Students Logic ---
+
+    let currentStudentPage = 1;
+    let currentStudentSearch = '';
+    let currentStudentYear = '';
+    let currentStudentCourse = '';
+
+    const renderStudentsTable = async (page = 1, searchTerm = '', yearLevel = '', courseId = '') => {
+        currentStudentPage = page;
+        currentStudentSearch = searchTerm;
+        currentStudentYear = yearLevel;
+        currentStudentCourse = courseId;
+        const tbody = document.getElementById('studentsTable').querySelector('tbody');
+        tbody.innerHTML = getLoadingHTML(6);
+
+        const response = await apiFetch(`/api/students?page=${page}&limit=10&search=${searchTerm}&year_level=${yearLevel}&course_id=${courseId}`);
+        if (!response || !response.success) return;
+
+        const { students, pagination } = response.data;
+        tbody.innerHTML = '';
+        if (students.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6">No students found.</td></tr>`;
+            renderPaginationControls(pagination);
+            return;
+        }
+
+        const canEdit = currentUser && ['admin', 'registrar'].includes(currentUser.role);
+
+        students.forEach(s => {
+            const tr = document.createElement('tr');
+            tr.className = s.gender === 'Male' ? 'gender-m' : 'gender-f';
+            const actionButtons = canEdit ? `
+                <button class="btn btn-green" data-action="edit" data-code="${s.student_code}" data-name="${s.name}" data-age="${s.age}" data-gender="${s.gender}" data-year="${s.year_level || ''}">Edit</button>
+                <button class="btn btn-red" data-action="delete" data-code="${s.student_code}" data-name="${s.name}">Delete</button>
+            ` : '<span>View Only</span>';
+            tr.innerHTML = `
+                <td>${s.student_code}</td><td><a href="#" class="link-style" data-action="view-profile" data-code="${s.student_code}">${s.name}</a></td><td>${s.age}</td><td>${s.gender}</td><td>${s.year_level || '-'}</td>
+                <td>${actionButtons}</td>`;
+            tbody.appendChild(tr);
+        });
+        renderPaginationControls(pagination);
+    };
+
+    const renderPaginationControls = (pagination) => {
+        const paginationControls = document.getElementById('paginationControls');
+        const { currentPage, totalPages } = pagination;
+        if (!paginationControls) return;
+        
+        if (totalPages <= 1) {
+            paginationControls.style.display = 'none';
+            return;
+        }
+        paginationControls.style.display = 'flex';
+        paginationControls.querySelector('#pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+        paginationControls.querySelector('#prevPageBtn').disabled = currentPage <= 1;
+        paginationControls.querySelector('#nextPageBtn').disabled = currentPage >= totalPages;
+    };
+
+    const initStudents = () => {
+        const searchInput = document.getElementById('searchStudentInput');
+        const filterYearLevel = document.getElementById('filterYearLevel');
+        const filterCourse = document.getElementById('filterCourse');
+        const studentsTable = document.getElementById('studentsTable');
+        const paginationControls = document.getElementById('paginationControls');
+        const addStudentBtn = document.getElementById('addStudentBtn');
+
+        // Populate Course Filter
+        (async () => {
+            const response = await apiFetch('/api/courses');
+            if (response && response.success) {
+                filterCourse.innerHTML = '<option value="">All Courses</option>';
+                response.data.forEach(c => {
+                    filterCourse.innerHTML += `<option value="${c.id}">${c.code} - ${c.name}</option>`;
+                });
+            }
+        })();
+
+        // Modal elements
+        const modal = document.getElementById('studentFormModal');
+        const form = document.getElementById('studentForm');
+        const formTitle = document.getElementById('studentFormTitle');
+        const cancelBtn = document.getElementById('cancelStudentFormBtn');
+        const editCodeInput = form.querySelector('#editStudentCode');
+
+        const openModal = async (studentData = null) => {
+            form.reset();
+            const stuCodeInput = form.querySelector('#stuCode');
+            const manualCodeInput = form.querySelector('#manualStudentCode');
+            if (studentData) { // Editing
+                formTitle.textContent = 'Edit Student';
+                editCodeInput.value = studentData.code;
+                form.querySelector('#stuName').value = studentData.name;
+                stuCodeInput.value = studentData.code;
+                form.querySelector('#stuAge').value = studentData.age;
+                form.querySelector('#stuGender').value = studentData.gender;
+                form.querySelector('#stuYearLevel').value = studentData.year;
+
+                form.querySelector('#manualStudentCodeGroup').style.display = 'none';
+                form.querySelector('#studentCodeGroup').style.display = 'block';
+                stuCodeInput.disabled = false;
+                stuCodeInput.required = true;
+                manualCodeInput.disabled = true;
+                manualCodeInput.required = false;
+            } else { // Adding
+                formTitle.textContent = 'Add New Student';
+                editCodeInput.value = '';
+                form.querySelector('#manualStudentCodeGroup').style.display = 'block';
+                form.querySelector('#studentCodeGroup').style.display = 'none';
+                stuCodeInput.disabled = true;
+                stuCodeInput.required = false;
+                manualCodeInput.disabled = false;
+                manualCodeInput.required = false;
+            }
+            modal.style.display = 'flex';
+        };
+
+        const closeModal = () => {
+            modal.style.display = 'none';
+        };
+
+        addStudentBtn.addEventListener('click', () => openModal());
+        cancelBtn.addEventListener('click', closeModal);
+        window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        
+        const refreshTable = () => renderStudentsTable(1, searchInput.value, filterYearLevel.value, filterCourse.value);
+        searchInput.addEventListener('input', debounce(refreshTable, 300));
+        filterYearLevel.addEventListener('change', refreshTable);
+        filterCourse.addEventListener('change', refreshTable);
+
+        paginationControls.addEventListener('click', (e) => {
+            if (e.target.id === 'prevPageBtn') {
+                if (currentStudentPage > 1) renderStudentsTable(currentStudentPage - 1, currentStudentSearch, currentStudentYear, currentStudentCourse);
+            } else if (e.target.id === 'nextPageBtn') {
+                renderStudentsTable(currentStudentPage + 1, currentStudentSearch, currentStudentYear, currentStudentCourse);
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            const student = {
+                name: form.querySelector('#stuName').value.trim(),
+                age: form.querySelector('#stuAge').value,
+                gender: form.querySelector('#stuGender').value,
+                year_level: form.querySelector('#stuYearLevel').value,
+                student_code: form.querySelector('#stuCode').value.trim(),
+            };
+            const editCode = editCodeInput.value;
+
+            if (!editCode) {
+                student.student_code = form.querySelector('#manualStudentCode').value.trim();
+            }
+
+            const url = editCode ? `/api/students/${editCode}` : '/api/students';
+            const method = editCode ? 'PUT' : 'POST';
+
+            const result = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(student) });
+
+            if (result) {
+                showMessage(editCode ? 'Student updated successfully.' : 'Student added successfully.');
+                closeModal();
+                searchInput.value = '';
+                refreshTable();
+            }
+            submitBtn.disabled = false;
+        });
+
+        studentsTable.addEventListener('click', async (e) => {
+            if (!e.target.matches('button, a')) return;
+            const { action, code, name, age, gender, year } = e.target.dataset;
+
+            if (action === 'delete') {
+                if (confirm(`Are you sure you want to delete ${name} (${code})? This action is permanent.`)) {
+                    const result = await apiFetch(`/api/students/${code}`, { method: 'DELETE' });
+                    if (result) {
+                        showMessage('Student deleted.');
+                        refreshTable();
+                    }
+                }
+            } else if (action === 'edit') {
+                openModal({ code, name, age, gender, year });
+            } else if (action === 'view-profile') {
+                e.preventDefault();
+                openProfileModal(code);
+            }
+        });
+
+        renderStudentsTable();
+    };
+
+    const initBulkUpload = () => {
+        const form = document.getElementById('bulkUploadForm');
+        if (!form) return;
+
+        const resultDiv = document.getElementById('bulkUploadResult');
+        const fileInput = document.getElementById('studentCsv');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = form.querySelector('button');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'UPLOADING...';
+            resultDiv.style.display = 'none';
+            resultDiv.innerHTML = '';
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showMessage('Please select a CSV file to upload.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'UPLOAD';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('studentCsv', fileInput.files[0]);
+
+            const response = await apiFetch('/api/students/upload-csv', { method: 'POST', body: formData });
+
+            if (response && response.success) {
+                const { message, errors, totalRows } = response.data;
+                showMessage(message);
+                resultDiv.style.display = 'block';
+
+                let errorHtml = '';
+                if (errors && errors.length > 0) {
+                    errorHtml = '<h4>Upload Errors:</h4><ul>' + errors.map(err => `<li><strong>${err.student || 'Unknown Row'}:</strong> ${err.error}</li>`).join('') + '</ul>';
+                }
+
+                resultDiv.innerHTML = `<p>Processed ${totalRows} rows.</p>${errorHtml}`;
+                renderStudentsTable(1, '');
+            }
+
+            form.reset();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'UPLOAD';
+        });
+    };
+
+    // --- Navigation & Sidebar Setup ---
+
+    const loadSection = (sectionName) => {
+        navLinks.forEach(link => link.classList.remove('active'));
+        const activeLink = document.querySelector(`.nav-link[data-section="${sectionName}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+            mobileHeaderTitle.textContent = activeLink.textContent;
+        }
+
+        switch (sectionName) {
+            case 'dashboard': loadDashboardSection(); break;
+            case 'students': loadStudentsSection(); break;
+            case 'attendance': loadAttendanceSection(); break;
+            case 'courses': loadCoursesSection(); break;
+            case 'rooms': loadRoomsSection(); break;
+            case 'registrations': loadRegistrationsSection(); break;
+            case 'excuses': loadExcusesSection(); break;
+            case 'announcements': loadAnnouncementsSection(); break;
+            case 'history': loadHistorySection(); break;
+            case 'password': loadPasswordSection(); break;
+            case 'staff': loadStaffSection(); break;
+            case 'audit': loadAuditSection(); break;
+        }
+        if (sidebar.classList.contains('open')) {
+            toggleSidebar();
+        }
+    };
+
+    const setupSidebar = (user) => {
+        if (!user) return;
+        currentUser = user;
+        userRoleBadge.textContent = user.role;
+
+        const rolePermissions = {
+            admin: ['dashboard', 'students', 'attendance', 'courses', 'rooms', 'registrations', 'excuses', 'announcements', 'history', 'password', 'staff', 'audit'],
+            registrar: ['dashboard', 'students', 'password'],
+            teacher: ['dashboard', 'attendance', 'excuses', 'announcements', 'history', 'password']
+        };
+
+        const allowedSections = rolePermissions[user.role] || [];
+
+        navLinks.forEach(link => {
+            const section = link.dataset.section;
+            if (allowedSections.includes(section)) {
+                link.style.display = 'block';
+            } else {
+                link.style.display = 'none';
+            }
+        });
+
+        if (allowedSections.length > 0) {
+            loadSection(allowedSections[0]);
+        }
+    };
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            loadSection(e.target.dataset.section);
+        });
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await apiFetch('/api/logout', { method: 'POST' });
+        showMessage('You have been logged out.');
+        window.location.href = '/login.html';
+    });
 
     // --- Initial Load ---
     const initializeDashboard = async () => {

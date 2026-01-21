@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Mark Attendance - Student Portal</title>
+    <link rel="icon" href="/icons/school-icon.jpeg" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+
+    <div class="login-wrapper" style="min-height: auto; max-width: 500px; flex-direction: column;">
+        <div class="login-branding" style="width: 100%; padding: 30px 20px; text-align: center; flex-direction: column;">
+            <h1 style="font-size: 28px;">Mark Attendance</h1>
+            <div id="digitalClock" class="digital-clock">--:--:--</div>
+            <p style="opacity: 0.9; margin-top: 5px;" id="currentDate">Loading date...</p>
+        </div>
+        <div class="login-form-container" style="width: 100%; padding: 30px 20px;">
+            <div class="login-inner-card" style="max-width: 100%;">
+                <p style="text-align: center; margin-bottom: 20px;">Enter the 6-character session code provided by your teacher.</p>
+                <form id="markAttendanceForm">
+                    <div class="form-group">
+                        <input type="text" id="attendanceCode" class="attendance-input" placeholder="X7Z9A2" maxlength="6" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-full btn-green" style="font-size: 16px; padding: 14px;">SUBMIT ATTENDANCE</button>
+                </form>
+                <div class="login-footer">
+                    <a href="/student-dashboard.html" style="display: inline-flex; align-items: center; gap: 5px;">
+                        <span>&larr;</span> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="toastContainer"></div>
+
+    <script type="module">
+        import { apiFetch, showMessage } from './utils.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check Session
+            const sessionRes = await apiFetch('/api/session');
+            if (!sessionRes || !sessionRes.success || !sessionRes.data.authenticated) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Clock Logic
+            const updateClock = () => {
+                const now = new Date();
+                document.getElementById('digitalClock').textContent = now.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                document.getElementById('currentDate').textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            };
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // Form Logic
+            const form = document.getElementById('markAttendanceForm');
+            const codeInput = document.getElementById('attendanceCode');
+
+            // Auto-focus and uppercase
+            codeInput.focus();
+            codeInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase();
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = form.querySelector('button');
+                const originalText = btn.textContent;
+                
+                btn.disabled = true;
+                btn.textContent = 'Verifying...';
+
+                const response = await apiFetch('/api/student/attendance/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: codeInput.value.trim() })
+                });
+
+                if (response && response.success) {
+                    showMessage(response.data.message);
+                    codeInput.value = '';
+                    setTimeout(() => {
+                        window.location.href = '/student-dashboard.html';
+                    }, 1500);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

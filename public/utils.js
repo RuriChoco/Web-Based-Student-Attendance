@@ -38,6 +38,15 @@ export async function apiFetch(url, options = {}) {
             throw new Error(errorMessage);
         }
 
+        // Prevent double wrapping if the server already returns the standard format
+        if (responseData && typeof responseData === 'object' && 'success' in responseData && 'data' in responseData) {
+            // Check if the data property is ALSO a standard response (double wrapped) and unwrap it
+            if (responseData.data && typeof responseData.data === 'object' && 'success' in responseData.data && 'data' in responseData.data) {
+                return responseData.data;
+            }
+            return responseData;
+        }
+
         return { success: true, data: responseData };
     } catch (error) {
         showMessage(error.message, 'error');
